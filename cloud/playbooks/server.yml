@@ -1,5 +1,7 @@
 #short_description: Create or delete Servers.
 
+# NOTE: PidginHost Server hostname are not required to be unique!
+
 #options:
 #  hostname:
 #    description:
@@ -111,33 +113,38 @@
 #   token: "{{ pidgin_host_token }}"
 #   state: present
 #   unique_hostname: true
-#   server_id: 583
-#   image: string,
-#   package: string,
-#   hostname: string,
-#   project: string,
-#   password: string,
-#   ssh_pub_key: string,
-#   ssh_pub_key_id: string,
-#   public_ip: string,
-#   new_ipv4: true,
-#   public_ipv6: string,
-#   new_ipv6: true,
-#   fw_rules_set: string,
-#   fw_policy_in: ACCEPT,
-#   fw_policy_out: ACCEPT,
-#   private_network: string,
-#   private_address: 198.51.100.42,
-#   extra_volume_product: string,
-#   extra_volume_size: 0,
+#   image: string
+#   package: string
+#   hostname: string
+#   project: string
+#   password: string
+#   ssh_pub_key: string
+#   ssh_pub_key_id: string
+#   public_ip: string
+#   new_ipv4: true
+#   public_ipv6: string
+#   new_ipv6: true
+#   fw_rules_set: string
+#   fw_policy_in: ACCEPT
+#   fw_policy_out: ACCEPT
+#   private_network: string
+#   private_address: 198.51.100.42
+#   extra_volume_product: string
+#   extra_volume_size: 0
 #   no_network_acknowledged: true
 #
-#- name: Delete volume
+#- name: Delete Server by server hostname
 # pidginhost.cloud.server:
 #   token: "{{ pidgin_host_token }}"
 #   state: absent
 #   unique_hostname: true
-#   hostname: string,
+#   hostname: string
+#
+#- name: Delete Server by server id
+# pidginhost.cloud.server:
+#   token: "{{ pidgin_host_token }}"
+#   state: absent
+#   server_id: true
 
 ---
 - name: Create or delete Servers
@@ -148,20 +155,10 @@
     ssh_pub_key: "ssh-rsa +Y8if4SLWfGcCCzAi7mM+//EUGJca0DP46f/++n4ZESF5IWQ2//9FrlVr81hVWDe6pOz3BH2M70oIebQv"
 
   tasks:
-    - name: Create Server
+    - name: Delete Server by id
       pidginhost.cloud.server:
-        state: present
-        unique_hostname: true
-        server_id: 583
-        token: "{{ pidgin_host_token }}"
-        ssh_pub_key: "{{ ssh_pub_key }}"
-        image: "ubuntu22"
-        package: "cloudv-3"
-        hostname: "hhtest22332.com"
-        project: "z5"
-        password: "passrt"
-        new_ipv4: true
-        new_ipv6: true
+        state: absent
+        server_id: 707
       register: result
     - debug:
         msg: "{{ result }}"

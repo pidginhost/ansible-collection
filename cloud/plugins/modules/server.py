@@ -132,37 +132,42 @@ options:
 
 EXAMPLES = r"""
 - name: Create Server
- pidginhost.cloud.server:
-   token: "{{ pidgin_host_token }}"
-   state: present
-   unique_hostname: true
-   server_id: 583
-   image: string,
-   package: string,
-   hostname: string,
-   project: string,
-   password: string,
-   ssh_pub_key: string,
-   ssh_pub_key_id: string,
-   public_ip: string,
-   new_ipv4: true,
-   public_ipv6: string,
-   new_ipv6: true,
-   fw_rules_set: string,
-   fw_policy_in: ACCEPT,
-   fw_policy_out: ACCEPT,
-   private_network: string,
-   private_address: 198.51.100.42,
-   extra_volume_product: string,
-   extra_volume_size: 0,
-   no_network_acknowledged: true
+pidginhost.cloud.server:
+  token: "{{ pidgin_host_token }}"
+  state: present
+  unique_hostname: true
+  image: string
+  package: string
+  hostname: string
+  project: string
+  password: string
+  ssh_pub_key: string
+  ssh_pub_key_id: string
+  public_ip: string
+  new_ipv4: true
+  public_ipv6: string
+  new_ipv6: true
+  fw_rules_set: string
+  fw_policy_in: ACCEPT
+  fw_policy_out: ACCEPT
+  private_network: string
+  private_address: 198.51.100.42
+  extra_volume_product: string
+  extra_volume_size: 0
+  no_network_acknowledged: true
 
-- name: Delete volume
- pidginhost.cloud.volume:
-   token: "{{ pidgin_host_token }}"
-   state: absent
-   unique_hostname: true
-   hostname: string,
+- name: Delete Server by server hostname
+pidginhost.cloud.server:
+  token: "{{ pidgin_host_token }}"
+  state: absent
+  unique_hostname: true
+  hostname: string
+
+- name: Delete Server by server id
+pidginhost.cloud.server:
+  token: "{{ pidgin_host_token }}"
+  state: absent
+  server_id: true
 """
 
 RETURN = """
@@ -463,16 +468,16 @@ def main():
                              default=False,
                          ),
                          server_id=dict(type='str', required=False),
-                         image=dict(type='str', required=True),
-                         package=dict(type='str', required=True),
-                         hostname=dict(type='str', required=True),
+                         image=dict(type='str', required=False),
+                         package=dict(type='str', required=False),
+                         hostname=dict(type='str', required=False),
                          project=dict(type='str', required=False),
-                         password=dict(type='str', required=True, no_log=True),
+                         password=dict(type='str', required=False, no_log=True),
                          ssh_pub_key_id=dict(type='str', required=False, no_log=True),
                          public_ip=dict(type='str', required=False),
-                         new_ipv4=dict(type=bool, required=True),
+                         new_ipv4=dict(type=bool, required=False),
                          public_ipv6=dict(type='str', required=False),
-                         new_ipv6=dict(type=bool, required=True),
+                         new_ipv6=dict(type=bool, required=False),
                          fw_rules_set=dict(type="str", required=False),
                          fw_policy_in=dict(type="str", required=False),
                          fw_policy_out=dict(type="str", required=False),
@@ -485,6 +490,14 @@ def main():
     module = AnsibleModule(
         argument_spec=argument_spec,
         supports_check_mode=True,
+        required_if=[
+            ("state", "present", ["image"]),
+            ("state", "present", ["package"]),
+            ("state", "present", ["hostname"]),
+            ("state", "present", ["password"]),
+            ("state", "present", ["new_ipv4"]),
+            ("state", "present", ["new_ipv6"]),
+        ],
     )
     PidginHostCloud(module)
 
