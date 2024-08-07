@@ -1,7 +1,7 @@
 # PidginHost Collection
 
 <p align="left" width="100%">
-<img src="ph+a.png"
+<img src="ph+an.png"
      alt="PidginHost + Ansible"
      title="PidginHost + Ansible"
      height=300>
