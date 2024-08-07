@@ -1,0 +1,11 @@
+#short_description: Print PidginHost profile info.
+
+---
+- name: Get PidginHost profile info
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print all profile data
+      pidginhost.cloud.profile_info:
+        state: present

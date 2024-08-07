@@ -1,0 +1,53 @@
+#short_description: Attach, detach volume from Server.
+
+#description:
+#  - Attach or detache volume from Server.
+#  - First, the volume needs to be detached and then attached.
+#  - Each volume may only be attached to a single Server.
+
+#options:
+#  volume_alias:
+#    description:
+#      - The name of the volume to attach or detach.
+#    type: str
+#    required: true
+#  server_hostname:
+#    description:
+#      - The hostname of the Server to attach or detach to the volume to.
+#    type: str
+#    required: true
+
+
+#EXAMPLES
+#- name: Attach volume to Server
+#  pidginhost.cloud.volume_action:
+#    token: "{{ token }}"
+#    state: present
+#    volume_alias: alias
+#    server_hostname: hostname.com
+
+#- name: Detach volume from Server
+#  pidginhost.cloud.volume_action:
+#    token: "{{ token }}"
+#    state: absent
+#    volume_alias: alias
+#    server_hostname: hostname.com
+---
+- name: Attach or Detach volume from Server
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+  tasks:
+    - name: Attach volume to Server
+      pidginhost.cloud.volume_action:
+        token: "{{ pidgin_host_token }}"
+        state: absent
+        volume_alias: Volume4444
+        server_hostname: hhtest22332.com
+      register: result
+
+    - debug:
+        msg: "{{ result }}"

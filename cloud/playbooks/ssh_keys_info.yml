@@ -1,0 +1,20 @@
+#short_description: Print SSH Keys info.
+
+---
+- name: Get SSH keys info
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+
+  tasks:
+    - name: Print all SSH keys info
+      pidginhost.cloud.ssh_keys_info:
+        state: present
+        token: "{{ pidgin_host_token }}"
+      register: result
+
+    - debug:
+        msg: "{{ result }}"

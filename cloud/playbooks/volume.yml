@@ -1,0 +1,89 @@
+#short_description: Add or Delete Volume
+
+#description:
+#  - Creates or deletes volumes.
+#  - View the create API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/v1/v1_cloud_servers_volumes_create).
+#  - View the delete API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/v1/v1_cloud_servers_destroy).
+#  - if product == "fast-storage", size_gigabytes must be between 10 and 1000
+#  - if product == "ultra-fast-storage", size_gigabytes must be between 10 and 100
+#
+#
+#options:
+# volume_alias:
+#   description:
+#     - The alias name of the Volume.
+#   type: str
+#   required: true
+#   when: state == "absent"
+# size_gigabytes:
+#   description:
+#     - The size of the storage volume in GiB
+#   type: int
+#   required: true
+#   when: state == "present"
+# product:
+#    description:
+#      - The type of volume being created
+#    type: str
+#    required: true
+#    when: state == "present"
+# hostname:
+#   description:
+#     - The hostname of the Server.
+#   type: str
+#   required: true
+#   when: state == "present"
+# product:
+#   description:
+#     - The type of storage product.
+#   type: str
+#   required: true
+#   when: state == "present"
+#   choices:
+#     - fast-storage
+#     - ultra-fast-storage
+# project:
+#   description:
+#     - The project name.
+#   type: str
+#   required: false
+
+#EXAMPLES
+
+#- name: Add volume to Server
+#  pidginhost.cloud.volume:
+#    token: "{{ pidgin_host_token }}"
+#    state: present
+#    project: "str"
+#    product: "fast-storage"
+#    hostname: 23423
+#    volume_alias: alias
+#    size_gigabytes: 10
+#
+#- name: Delete volume
+#  pidginhost.cloud.volume:
+#    token: "{{ pidgin_host_token }}"
+#    state: absent
+#    volume_alias: alias
+
+---
+- name: Create or Delete PidginHost volume
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+
+  tasks:
+    - name: Delete volume
+      pidginhost.cloud.volume:
+        token: "{{ pidgin_host_token }}"
+        state: present
+        product: fast-storage
+        volume_alias: Volume4444
+        hostname: hhtest22332.com
+        size_gigabytes: 50
+      register: result
+    - debug:
+        msg: "{{ result }}"

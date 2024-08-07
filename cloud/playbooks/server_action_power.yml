@@ -1,0 +1,91 @@
+#short_description: Manipulate Servers action power.
+
+#description:
+#  - Set power states of a Server.
+#  - State "start" powers on a Server.
+#  - |
+#    State "stop" is a hard shutdown and should only be used if the shutdown
+#    action is not successful. It is similar to cutting the power on a server and
+#    could lead to complications.
+#  - |
+#    State "shutdown" is an attempt to shut down the Server in a graceful way,
+#    similar to using the shutdown command from the console. Since a "shutdown"
+#    command can fail, this action guarantees that the command is issued, not that
+#    it succeeds. The preferred way to turn off a Server is to attempt a "shutdown",
+#    with a reasonable timeout, followed by a "stop" state to ensure the
+#    Server is off.
+
+#options:
+#  server_id:
+#    description:
+#      - A unique identifier for a Server instance.
+#      - If provided, `server_hostname` is ignored.
+#    type: int
+#    required: false
+#
+#  server_hostname:
+#    description:
+#      - The hostname of the Server to act on.
+#      - If provided, must be unique.
+#    type: str
+#    required: false
+#
+#  state:
+#    description:
+#      - The power state transition.
+#    type: str
+#    choices: [start, stop, shutdown, reboot]
+#    default: start
+#
+#  force_power_off:
+#    description:
+#      - Force power off if C(shutdown) fails.
+#    type: bool
+#    required: false
+#    default: false
+
+# EXAMPLES:
+#- name: Power off a Cloud Server
+#  pidginhost.cloud.server_action_power:
+#    token: "{{ token }}"
+#    state: stop
+#    server_id: 1122334455
+#
+#- name: Power on a Cloud Server
+#  pidginhost.cloud.server_action_power:
+#    token: "{{ token }}"
+#    state: start
+#    server_id: 1122334455
+#
+#- name: Reboot a Cloud Server
+#  pidginhost.cloud.server_action_power:
+#    token: "{{ token }}"
+#    state: reboot
+#    server_id: 1122334455
+#
+#- name: Shut down a Cloud Server (force if unsuccessful)
+#  pidginhost.cloud.server_action_power:
+#    token: "{{ token }}"
+#    state: shutdown
+#    force_power_off: true
+#    server_id: 1122334455
+
+---
+- name: Manage Server power action
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+
+  tasks:
+    - name: Power off a Cloud Server
+      pidginhost.cloud.server_action_power:
+        token: "{{ pidgin_host_token }}"
+        state: stop
+        server_hostname: hhtest22332.com
+      register: result
+
+    - debug:
+        msg: "{{ result }}"

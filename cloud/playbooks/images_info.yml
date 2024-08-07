@@ -1,0 +1,20 @@
+#short_description: Print PidginHost images info.
+
+---
+- name: Get PidginHost images info
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+
+  tasks:
+    - name: Print all images data
+      pidginhost.cloud.images_info:
+        state: present
+        token: "{{ pidgin_host_token }}"
+      register: result
+
+    - debug:
+        msg: "{{ result }}"

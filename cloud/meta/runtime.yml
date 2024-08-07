@@ -1,0 +1,24 @@
+---
+requires_ansible: ">=2.14.0" # Use '>= 2.9.10' instead, if needed
+action_groups:
+  all:
+    - firewall
+    - firewall_action
+    - firewalls_info
+    - images_info
+    - ip_action
+    - ips_info
+    - packages_info
+    - profile_info
+    - public_interface_info
+    - server
+    - server_action_power
+    - server_action_resize
+    - server_public_ip
+    - servers_info
+    - ssh_key
+    - ssh_keys_info
+    - volume
+    - volume_action
+    - volumes_info
+    - volumes_products_info

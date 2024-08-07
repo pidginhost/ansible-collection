@@ -1,0 +1,27 @@
+---
+plugin: pidginhost.cloud.servers
+cache: true
+cache_plugin: ansible.builtin.jsonfile
+cache_connection: ./tmp/pidginhost_servers_inventory
+cache_timeout: 300
+attributes:
+  - cpus
+  - disk_size
+  - hostname
+  - id
+  - image
+  - memory
+  - networks
+  - package
+  - project
+  - status
+compose:
+  ansible_host: "networks.public.ipv4 | default('No IPv4 address found')"
+keyed_groups:
+  - key: status
+    prefix: status
+    separator: _
+  - key: project
+    prefix: project
+groups:
+  ubuntu: "'ubuntu' in image"
