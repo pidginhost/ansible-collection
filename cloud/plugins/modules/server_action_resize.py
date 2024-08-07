@@ -64,7 +64,7 @@ extends_documentation_fragment:
 """
 
 EXAMPLES = r"""
-- name: Resize a Server Volume
+- name: Resize a Server Volume by hostname
  pidginhost.cloud.server_action_resize:
    state: present
    token: "{{ pidgin_host_token }}"
@@ -74,11 +74,29 @@ EXAMPLES = r"""
    volume_alias: Volume4444
    product: fast-storage
 
-- name: Upgrade Server package
+- name: Resize a Server Volume by id
+ pidginhost.cloud.server_action_resize:
+   state: present
+   token: "{{ pidgin_host_token }}"
+   server_id: 23423
+   disk: true
+   size_gigabytes: 60
+   volume_alias: Volume4444
+   product: fast-storage
+
+- name: Upgrade Server package by hostname
  pidginhost.cloud.server_action_resize:
    state: present
    token: "{{ pidgin_host_token }}"
    server_hostname: hhtest22332.com
+   disk: false
+   package_name: cloudv-3
+
+- name: Upgrade Server package by id
+ pidginhost.cloud.server_action_resize:
+   state: present
+   token: "{{ pidgin_host_token }}"
+   server_id: 234234
    disk: false
    package_name: cloudv-3
 """

@@ -34,10 +34,9 @@
     pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
 
   tasks:
-    - name: Print volumes info for specific Server id
+    - name: Print all volumes info
       pidginhost.cloud.volumes_info:
         state: present
-#        server_id: 707
         token: "{{ pidgin_host_token }}"
       register: result
 

@@ -50,7 +50,15 @@ options:
 """
 
 EXAMPLES = r"""
-- name: Attach ip to Server
+- name: Attach ip to Server by hostname
+ pidginhost.cloud.ip_action:
+   token: "{{ pidgin_host_token }}"
+   server_hostname: hostname
+   server_ip: 23432
+   state: present
+   server_hostname: hostname
+
+- name: Attach ip to Server by id
  pidginhost.cloud.ip_action:
    token: "{{ pidgin_host_token }}"
    server_hostname: hostname
@@ -63,7 +71,6 @@ EXAMPLES = r"""
    token: "{{ pidgin_host_token }}"
    state: absent
    ip_address: 4234223
-
 """
 RETURN = """
 ips:

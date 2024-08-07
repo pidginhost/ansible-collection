@@ -65,34 +65,56 @@ options:
 """
 
 EXAMPLES = r"""
-- name: Power off a Cloud Server
+- name: Power off a Cloud Server by hostname
+ pidginhost.cloud.server_action_power:
+   token: "{{ token }}"
+   state: stop
+   server_hostname: hostname
+
+- name: Power off a Cloud Server by id
  pidginhost.cloud.server_action_power:
    token: "{{ token }}"
    state: stop
    server_id: 1122334455
+
+
+- name: Power on a Cloud Server by hostname
+ pidginhost.cloud.server_action_power:
+   token: "{{ token }}"
+   state: start
    server_hostname: hostname
 
-- name: Power on a Cloud Server
+- name: Power on a Cloud Server id
  pidginhost.cloud.server_action_power:
    token: "{{ token }}"
    state: start
    server_id: 1122334455
+
+- name: Reboot a Cloud Server by hostname
+ pidginhost.cloud.server_action_power:
+   token: "{{ token }}"
+   state: reboot
    server_hostname: hostname
 
-- name: Reboot a Cloud Server
+- name: Reboot a Cloud Server by id
  pidginhost.cloud.server_action_power:
    token: "{{ token }}"
    state: reboot
    server_id: 1122334455
+
+- name: Shut down a Cloud Server (force if unsuccessful) by hostname
+ pidginhost.cloud.server_action_power:
+   token: "{{ token }}"
+   state: shutdown
+   force_power_off: true
    server_hostname: hostname
 
-- name: Shut down a Cloud Server (force if unsuccessful)
+- name: Shut down a Cloud Server (force if unsuccessful) by id
  pidginhost.cloud.server_action_power:
    token: "{{ token }}"
    state: shutdown
    force_power_off: true
    server_id: 1122334455
-   server_hostname: hostname
 """
 
 RETURN = """
