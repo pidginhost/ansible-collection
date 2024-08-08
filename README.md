@@ -63,7 +63,7 @@ requests
 
 ## Using this collection
 
-There are sample playbooks in the [playbooks](./playbooks) directory.
+There are sample playbooks in the [playbooks](playbooks) directory.
 
 Be sure to set the `$PIDGINHOST_TOKEN` environment variable as all modules require authentication.
 This is preferable in contrast to using the `token` module parameter in the play and storing your API token in plaintext
@@ -72,7 +72,7 @@ within your playbook.
 > **Warning**
 > Keep in mind, running the sample playbooks that create cloud resources will cost real money.
 
-[This](./playbooks/profile_info.yml) is a sample playbook which returns your PidginHost account information:
+[This](playbooksrofile_info.yml) is a sample playbook which returns your PidginHost account information:
 
 ```yaml
 ---
@@ -106,7 +106,7 @@ localhost                  : ok=1    changed=0    unreachable=0    failed=0    s
 > PidginHost does not require Server hostname to be unique - this functionality is enforced by the
 > `pidginhost.cloud.server` module in conjunction with its `unique_hostname` parameter.
 
-[This](./inventory/pidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
+[This](inventoryidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
 
 Output should look similar to the following:
 
