@@ -128,8 +128,6 @@ action:
     failed: false
     action:
       status: stopped
-    changed: true
-    failed: false
 
 error:
   description: PidginHost API error.

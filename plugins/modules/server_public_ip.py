@@ -35,7 +35,13 @@ EXAMPLES = r"""
 
 RETURN = """
 server:
-
+  description:
+    - IPS info.
+  type: list
+  returned: always
+  sample:
+    changed: false
+    failed: false
 error:
   description: PidginHost API error.
   returned: failure
