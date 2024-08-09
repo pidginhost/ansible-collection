@@ -7,21 +7,20 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-DOCUMENTATION = r"""
+DOCUMENTATION = r'''
 ---
-module: server_public_ip
+module: pidginhost.cloud.server_public_ip
 
 short_description: Get specific server ip.
 
 version_added: 0.2.0
 
 description:
-  - Get specific server id..
+  - Get specific server id.
   - View the API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_retrieve).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
-
 
 options:
   server_hostname:
@@ -30,7 +29,7 @@ options:
       - If provided, must be unique.
     type: str
     required: true
-"""
+'''
 
 EXAMPLES = r"""
 - name: Get specific server ip
