@@ -266,6 +266,12 @@ class PidginHostCloud(PidginHostCommonModule):
         self.no_network_acknowledged = module.params.get("no_network_acknowledged")
         self.timeout = module.params.get("timeout")
 
+        if not self.password and not self.ssh_pub_key:
+            self.module.fail_json(
+                changed=False,
+                msg=f"At least one of 'password' or 'ssh_pub_key' must be provided.",
+                server=[],
+            )
         # Dynamic max length checker
         self.arguments_max_length(hostname=self.hostname, project=self.project,
                                   password=self.password, ssh_pub_key=self.ssh_pub_key,
