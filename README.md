@@ -48,7 +48,6 @@ requests
 | `pidginhost.cloud.server`                | Create or delete Servers                          |
 | `pidginhost.cloud.server_action_power`   | Manage Servers action power                       |
 | `pidginhost.cloud.server_action_resize`  | Resize a Server Volume or upgrade Server package  |
-| `pidginhost.cloud.server_public_ip`      | Get specific server ip                            |
 | `pidginhost.cloud.servers_info`          | Get all Servers info                              |
 | `pidginhost.cloud.ssh_key`               | Manage SSH Keys                                   |
 | `pidginhost.cloud.ssh_keys_info`         | Get SSH Keys info                                 |
