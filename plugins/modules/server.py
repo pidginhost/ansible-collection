@@ -493,11 +493,8 @@ def main():
         required_if=[
             ("state", "present", ["image"]),
             ("state", "present", ["package"]),
-            ("state", "present", ["hostname"]),
-            ("state", "present", ["password"]),
-            ("state", "present", ["new_ipv4"]),
-            ("state", "present", ["new_ipv6"]),
         ],
+        required_one_of=["password", "ssh_pub_key"]
     )
     PidginHostCloud(module)
 
