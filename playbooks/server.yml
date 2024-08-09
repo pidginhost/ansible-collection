@@ -155,10 +155,15 @@
     ssh_pub_key: "ssh-rsa +Y8if4SLWfGcCCzAi7mM+//EUGJca0DP46f/++n4ZESF5IWQ2//9FrlVr81hVWDe6pOz3BH2M70oIebQv"
 
   tasks:
-    - name: Delete Server by id
+    - name: Create Server
       pidginhost.cloud.server:
-        state: absent
-        server_id: 707
+        token: "{{ pidgin_host_token }}"
+        state: present
+        unique_hostname: true
+        image: ubuntu22
+        package: cloudv-5
+        hostname: asdfsadfdsa
+        password: afdsfsfsfsf
       register: result
     - debug:
         msg: "{{ result }}"

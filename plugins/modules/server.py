@@ -493,9 +493,7 @@ def main():
         required_if=[
             ("state", "present", ["image"]),
             ("state", "present", ["package"]),
-        ],
-        required_one_of=["password", "ssh_pub_key"],
-        required_by="auto",
+        ]
     )
     PidginHostCloud(module)
 
