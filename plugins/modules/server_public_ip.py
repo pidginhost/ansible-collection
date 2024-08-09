@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: pidginhost.cloud.server_public_ip
 
@@ -29,7 +29,7 @@ options:
       - If provided, must be unique.
     type: str
     required: true
-'''
+"""
 
 EXAMPLES = r"""
 - name: Get specific server ip
@@ -39,7 +39,7 @@ EXAMPLES = r"""
     server_hostname: "{{ server_hostname }}"
 """
 
-RETURN = """
+RETURN = r"""
 server:
   description:
     - Get specific server ip.
