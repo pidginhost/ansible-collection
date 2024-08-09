@@ -11,7 +11,7 @@ DOCUMENTATION = r"""
 ---
 module: firewall
 
-short_description: Create firewalls rules set or add rules to rules set.
+short_description: Create firewalls rules set, add rules to rules set or delete rules set.
 
 version_added: 0.2.0
 
@@ -88,20 +88,20 @@ options:
 EXAMPLES = r"""
 - name: Delete firewall (rules set)
   pidginhost.cloud.firewall:
-    token: "{{ pidginhost_token }}"
+    token: "{{ pidgin_host_token }}"
     state: absent
     rules_set_name: Firewall rules set name
     
 - name: Create firewall (rules set)
   pidginhost.cloud.firewall:
-    token: "{{ pidginhost_token }}"
+    token: "{{ pidgin_host_token }}"
     state: present
     create_rules_set: true
     rules_set_name: Firewall rules set name
 
 - name: Add firewall rules to (rules set)
   pidginhost.cloud.firewall:
-    token: "{{ pidginhost_token }}"
+    token: "{{ pidgin_host_token }}"
     state: present
     rules_set_name: New Firewall1
     create_rules_set: false
@@ -118,11 +118,26 @@ EXAMPLES = r"""
 
 RETURN = r"""
 firewall:
-  description: 
-    - Firewall action.
+  description:
+    - Create firewall (rules set)
   type: dict
   returned: always
   sample:
+    module_args:
+      action: null
+      create_rules_set: true
+      destination: null
+      direction: null
+      dport: null
+      enabled: null
+      position: null
+      protocol: null
+      rules_set_name: Firewall rules set name22222
+      source: null
+      sport: null
+      state: present
+      timeout: 300
+      token: VALUE_SPECIFIED_IN_NO_LOG_PARAMETER
     
 error:
   description: PidginHost API error.
