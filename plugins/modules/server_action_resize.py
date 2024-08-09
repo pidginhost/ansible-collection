@@ -46,7 +46,7 @@ options:
     required: true
   size_gigabytes:
     description:
-      - The gigabytes size to resize the Volume..
+      - The gigabytes size to resize the Volume.
     type: int
     required: false
   package_name:
@@ -101,6 +101,13 @@ EXAMPLES = r"""
 
 RETURN = """
 action:
+  description: 
+    - Resize a Server Volume or upgrade Server package
+  type: dict
+  returned: always
+  changed: true
+  failed: false
+  sample:
     cpus: 8
     disk_size: 200
     hostname: hhtest22332.com
@@ -143,8 +150,6 @@ action:
         project: z5
         server: hhtest22332.com
         size: 50
-  changed: true
-  failed: false
 
 error:
   description: PidginHost API error.

@@ -101,6 +101,6 @@
     - name: Delete firewall rules set
       pidginhost.cloud.firewall:
         token: "{{ pidgin_host_token }}"
-        state: present
+        state: absent
         create_rules_set: true
         rules_set_name: Firewall rules set name

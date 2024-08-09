@@ -104,7 +104,7 @@ options:
       - The private IPv4 address for the server.
     type: str
     required: false
-  private_address:
+  extra_volume_product:
     description:
       - Additional volume type for the server.
     type: str
