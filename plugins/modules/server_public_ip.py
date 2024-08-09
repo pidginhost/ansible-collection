@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-import time
-
 DOCUMENTATION = r"""
 ---
 module: server_public_ip
@@ -24,7 +22,16 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+
+options:
+  server_hostname:
+    description:
+      - The hostname of the Server to act on.
+      - If provided, must be unique.
+    type: str
+    required: true
 """
+
 EXAMPLES = r"""
 - name: Get specific server ip
   pidginhost.cloud.server_public_ip:
@@ -63,6 +70,7 @@ msg:
     - Find Server id: 232 with ip address: IP_ADDRESS
 """
 
+import time
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
 
@@ -104,7 +112,7 @@ class ServerPublicIP(PidginHostCommonModule):
 def main():
     argument_spec = PidginHostOptions.argument_spec()
     argument_spec.update(
-        server_hostname=dict(type="str", required=False),
+        server_hostname=dict(type="str", required=True),
     )
     module = AnsibleModule(
         argument_spec=argument_spec,
