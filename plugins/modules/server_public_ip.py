@@ -36,12 +36,13 @@ EXAMPLES = r"""
 RETURN = """
 server:
   description:
-    - IPS info.
-  type: list
+    - Get specific server ip.
+  type: dict
   returned: always
   sample:
     changed: false
     failed: false
+    server: 176.124.106.79
 error:
   description: PidginHost API error.
   returned: failure
@@ -67,7 +68,7 @@ from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
 class ServerPublicIP(PidginHostCommonModule):
     def __init__(self, module):
         super().__init__(module)
-        self.hostname = module.params.get('hostname')
+        self.hostname = module.params.get('server_hostname')
         if self.state == "present":
             self.present()
 
@@ -101,7 +102,7 @@ class ServerPublicIP(PidginHostCommonModule):
 def main():
     argument_spec = PidginHostOptions.argument_spec()
     argument_spec.update(
-        hostname=dict(type="str", required=False),
+        server_hostname=dict(type="str", required=False),
     )
     module = AnsibleModule(
         argument_spec=argument_spec,
