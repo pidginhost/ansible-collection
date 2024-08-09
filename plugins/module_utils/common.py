@@ -220,7 +220,7 @@ class PidginHostCommonModule(PidginHostLengthChecker):
         return self.get_request(url, self.SUCCESS_CODE)
 
     def delete_firewall_rules_set(self, rules_set_id):
-        url = f"{self.SSH_KEYS_ENDPOINT}{rules_set_id}"
+        url = f"{self.FIREWALL_RULES_SET_ENDPOINT}{rules_set_id}"
         return self.delete_request(url, self.DELETE_SUCCESS_CODE)
 
     def get_firewalls_info(self, api_code):
