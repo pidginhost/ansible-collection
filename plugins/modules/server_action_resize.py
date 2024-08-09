@@ -59,8 +59,6 @@ options:
       - The alias name of the volume intended for resizing.
     type: str
     required: false
-extends_documentation_fragment:
-  - digitalocean.cloud.common.documentation
 """
 
 EXAMPLES = r"""
