@@ -26,12 +26,12 @@ author:
 
 EXAMPLES = r"""
 - name: Print Servers info
- pidginhost.cloud.servers_info:
-   token: "{{ token }}"
-   state: present
+  pidginhost.cloud.servers_info:
+    token: "{{ token }}"
+    state: present
 """
 
-RETURN = """
+RETURN = r"""
 servers:
   changed: false
   failed: false
@@ -68,7 +68,7 @@ msg:
   sample:
     - All Servers info..
     - No Server info.
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

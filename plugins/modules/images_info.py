@@ -24,7 +24,14 @@ author:
 
 """
 
-RETURN = """
+EXAMPLES = r"""
+- name: Print all images data
+  pidginhost.cloud.images_info:
+    token: "{{ pidgin_host_token }}"
+    state: present
+"""
+
+RETURN = r"""
 images:
   description: 
     - Represents the information about images.

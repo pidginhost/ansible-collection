@@ -22,15 +22,15 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 """
 
-EXAMPLES = """
-    - name: Print all volumes Products
-      pidginhost.cloud.volumes_products_info:
-        state: present
-        token: "{{ pidgin_host_token }}"
-      register: result
+EXAMPLES = r"""
+- name: Print all volumes Products
+  pidginhost.cloud.volumes_products_info:
+    state: present
+    token: "{{ pidgin_host_token }}"
+  register: result
 """
 
-RETURN = """
+RETURN = r"""
 volumes:
   description: 
     - Represents the information about storage products.
@@ -74,7 +74,7 @@ msg:
   type: str
   sample:
     - Storage Products info.
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

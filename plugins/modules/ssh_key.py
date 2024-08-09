@@ -25,50 +25,50 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 
 options:
- delete_others:
-   description:
-     - Keep only the keys specified in "keys_list" and delete others.
-   type: bool
-   required: false
-   choices:
-    - true
-    - false
- keys_list:
-   description:
-     - A list of keys, must contain at least one key.
-   type: list
-   required: true
+  delete_others:
+    description:
+      - Keep only the keys specified in "keys_list" and delete others.
+    type: bool
+    required: false
+    choices:
+      - true
+      - false
+  keys_list:
+    description:
+      - A list of keys, must contain at least one key.
+    type: list
+    required: true
 """
 
 EXAMPLES = r"""
- - name: Add SSH keys
-   pidginhost.cloud.ssh_key:
-     state: present
-     delete_others: false
-     token: "{{ pidgin_host_token }}"
-     ssh_pub_key: "{{ item }}"
-   with_items: "{{ keys_list }}"
-   when: not delete_others
+- name: Add SSH keys
+  pidginhost.cloud.ssh_key:
+    state: present
+    delete_others: false
+    token: "{{ pidgin_host_token }}"
+    ssh_pub_key: "{{ item }}"
+  with_items: "{{ keys_list }}"
+  when: not delete_others
 
- - name: Delete SSH keys
-   pidginhost.cloud.ssh_key:
-     state: absent
-     delete_others: false
-     token: "{{ pidgin_host_token }}"
-     ssh_pub_key: "{{ item }}"
-   with_items: "{{ keys_list }}"
-   when: not delete_others
+- name: Delete SSH keys
+  pidginhost.cloud.ssh_key:
+    state: absent
+    delete_others: false
+    token: "{{ pidgin_host_token }}"
+    ssh_pub_key: "{{ item }}"
+  with_items: "{{ keys_list }}"
+  when: not delete_others
 
- - name: Add specified SSH keys and delete any other SSH keys found based on the delete_others flag
-   pidginhost.cloud.ssh_key:
-     state: present
-     delete_others: true
-     token: "{{ pidgin_host_token }}"
-     ssh_pub_key: "{{ keys_list }}"
-   when: delete_others == true and state == 'present'
+- name: Add specified SSH keys and delete any other SSH keys found based on the delete_others flag
+  pidginhost.cloud.ssh_key:
+    state: present
+    delete_others: true
+    token: "{{ pidgin_host_token }}"
+    ssh_pub_key: "{{ keys_list }}"
+  when: delete_others == true and state == 'present'
 """
 
-RETURN = """
+RETURN = r"""
 ssh_key:
   changed: true
   results:
@@ -131,7 +131,7 @@ added_keys:
   type: str
   sample:
     - Lis of Added Keys.
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

@@ -41,21 +41,21 @@ options:
 
 EXAMPLES = r"""
 - name: Attach volume to Server
- pidginhost.cloud.volume_action:
-   token: "{{ token }}"
-   state: present
-   volume_alias: alias
-   server_hostname: hostname.com
+  pidginhost.cloud.volume_action:
+    token: "{{ token }}"
+    state: present
+    volume_alias: alias
+    server_hostname: hostname.com
 
 - name: Detach volume from Server
- pidginhost.cloud.volume_action:
-   token: "{{ token }}"
-   state: absent
-   volume_alias: alias
-   server_hostname: hostname.com
+  pidginhost.cloud.volume_action:
+    token: "{{ token }}"
+    state: absent
+    volume_alias: alias
+    server_hostname: hostname.com
 """
 
-RETURN = """
+RETURN = r"""
 action:
   description: 
     - Attach or detach volume from Server.
@@ -93,7 +93,7 @@ msg:
     - Attached volume (ALIAS) to (HOSTNAME)
     - Volume alias : (ALIAS) id : (191) would be detached from (HOSTNAME)
     - No attached volume with alias: ALIAS
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

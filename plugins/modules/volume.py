@@ -25,65 +25,63 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 
 options:
- volume_alias:
-   description:
-     - The alias name of the Volume.
-   type: str
-   required: true
-   when: state == "absent"
- size_gigabytes:
-   description:
-     - The size of the storage volume in GiB
-   type: int
-   required: true
-   when: state == "present"
- product:
+  volume_alias:
     description:
-      - The type of volume being created
+      - The alias name of the Volume.
+    type: str
+    required: true
+    when: state == "absent"
+
+  size_gigabytes:
+    description:
+      - The size of the storage volume in GiB.
+    type: int
+    required: true
+    when: state == "present"
+
+  product:
+    description:
+      - The type of volume being created.
     type: str
     required: true
     when: state == "present"
- hostname:
-   description:
-     - The hostname of the Server.
-   type: str
-   required: true
-   when: state == "present"
- product:
-   description:
-     - The type of storage product.
-   type: str
-   required: true
-   when: state == "present"
-   choices:
-     - fast-storage
-     - ultra-fast-storage
- project:
-   description:
-     - The project name.
-   type: str
-   required: false
+    choices:
+      - fast-storage
+      - ultra-fast-storage
+
+  hostname:
+    description:
+      - The hostname of the Server.
+    type: str
+    required: true
+    when: state == "present"
+
+  project:
+    description:
+      - The project name.
+    type: str
+    required: false
 """
 
 EXAMPLES = r"""
 - name: Add volume to Server
- pidginhost.cloud.volume:
-   token: "{{ pidgin_host_token }}"
-   state: present
-   project: "str"
-   product: "fast-storage"
-   hostname: hostname.com
-   volume_alias: alias
-   size_gigabytes: 10
+  pidginhost.cloud.volume:
+    token: "{{ pidgin_host_token }}"
+    state: present
+    project: "str"
+    product: "fast-storage"
+    hostname: hostname.com
+    volume_alias: alias
+    size_gigabytes: 10
 
 - name: Delete volume
- pidginhost.cloud.volume:
-   token: "{{ pidgin_host_token }}"
-   state: absent
-   volume_alias: alias
+  pidginhost.cloud.volume:
+    token: "{{ pidgin_host_token }}"
+    state: absent
+    volume_alias: alias
 """
 
-RETURN = """
+RETURN = r"""
 volume:
   description:
     - Represents action on volume.

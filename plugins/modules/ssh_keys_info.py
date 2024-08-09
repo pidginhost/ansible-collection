@@ -23,15 +23,15 @@ author:
 
 """
 
-EXAMPLES = """
-    - name: Print SSH Keys info
-      pidginhost.cloud.ssh_keys_info:
-        state: present
-        token: "{{ pidgin_host_token }}"
-      register: result
+EXAMPLES = r"""
+- name: Print SSH Keys info
+  pidginhost.cloud.ssh_keys_info:
+    state: present
+    token: "{{ pidgin_host_token }}"
+  register: result
 """
 
-RETURN = """
+RETURN = r"""
 ssh_keys:
   changed: false
   failed: false
@@ -54,7 +54,7 @@ msg:
   type: str
   sample:
     - Current SSH keys.
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

@@ -55,7 +55,7 @@ EXAMPLES = r"""
     rules_set_name: name
 """
 
-RETURN = """
+RETURN = r"""
 firewall:
   description: 
     - Firewall action.
@@ -82,7 +82,7 @@ msg:
     - No Server named with hostname HOSTNAME
     - Multiple Servers (3242) found, with hostname: (HOSTNAME)
     - Firewall rules set RULES_SET_NAME would be applied to server HOSTNAME
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

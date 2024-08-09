@@ -63,43 +63,43 @@ options:
 
 EXAMPLES = r"""
 - name: Resize a Server Volume by hostname
- pidginhost.cloud.server_action_resize:
-   state: present
-   token: "{{ pidgin_host_token }}"
-   server_hostname: hhtest22332.com
-   disk: true
-   size_gigabytes: 60
-   volume_alias: Volume4444
-   product: fast-storage
+  pidginhost.cloud.server_action_resize:
+    state: present
+    token: "{{ pidgin_host_token }}"
+    server_hostname: hhtest22332.com
+    disk: true
+    size_gigabytes: 60
+    volume_alias: Volume4444
+    product: fast-storage
 
 - name: Resize a Server Volume by id
- pidginhost.cloud.server_action_resize:
-   state: present
-   token: "{{ pidgin_host_token }}"
-   server_id: 23423
-   disk: true
-   size_gigabytes: 60
-   volume_alias: Volume4444
-   product: fast-storage
+  pidginhost.cloud.server_action_resize:
+    state: present
+    token: "{{ pidgin_host_token }}"
+    server_id: 23423
+    disk: true
+    size_gigabytes: 60
+    volume_alias: Volume4444
+    product: fast-storage
 
 - name: Upgrade Server package by hostname
- pidginhost.cloud.server_action_resize:
-   state: present
-   token: "{{ pidgin_host_token }}"
-   server_hostname: hhtest22332.com
-   disk: false
-   package_name: cloudv-3
+  pidginhost.cloud.server_action_resize:
+    state: present
+    token: "{{ pidgin_host_token }}"
+    server_hostname: hhtest22332.com
+    disk: false
+    package_name: cloudv-3
 
 - name: Upgrade Server package by id
- pidginhost.cloud.server_action_resize:
-   state: present
-   token: "{{ pidgin_host_token }}"
-   server_id: 234234
-   disk: false
-   package_name: cloudv-3
+  pidginhost.cloud.server_action_resize:
+    state: present
+    token: "{{ pidgin_host_token }}"
+    server_id: 234234
+    disk: false
+    package_name: cloudv-3
 """
 
-RETURN = """
+RETURN = r"""
 action:
   description: 
     - Resize a Server Volume or upgrade Server package
@@ -175,7 +175,7 @@ msg:
     - Volume (VOLUME_ALIAS) from Server HOSTNAME (23442) would be sent action 'resize',
       requested size is '55' and current size is 44
     - Volume (VOLUME_ALIAS) from Server HOSTNAME (2323) current size is '55' and last size was 44
-  """
+"""
 
 import time
 from ansible.module_utils.basic import AnsibleModule

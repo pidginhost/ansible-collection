@@ -116,7 +116,7 @@ EXAMPLES = r"""
     position: 0
 """
 
-RETURN = """
+RETURN = r"""
 firewall:
   description: 
     - Firewall action.
@@ -147,7 +147,7 @@ msg:
     - Firewall rules has been added for RULES_SET_NAME
     - Firewall rules set RULES_SET_NAME (24234) would be deleted
     - Firewall rules set RULES_SET_NAME (23432) has been be deleted
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

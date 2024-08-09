@@ -31,7 +31,8 @@ EXAMPLES = r"""
     server_id: 624
     token: "{{ pidgin_host_token }}"
 """
-RETURN = """
+
+RETURN = r"""
 interfaces:
   description: 
     - Represents the information about storage products.
@@ -61,7 +62,7 @@ msg:
   type: str
   sample:
     - All Volumes info for server id : 234.
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

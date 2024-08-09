@@ -29,50 +29,50 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 
 options:
- server_id:
-   description:
-     - A unique identifier for a Server instance.
-     - If provided, `server_hostname` is ignored.
-   type: int
-   required: false
+  server_id:
+    description:
+      - A unique identifier for a Server instance.
+      - If provided, 'server_hostname' is ignored.
+    type: int
+    required: false
 
- server_hostname:
-   description:
-     - The hostname of the Server to act on.
-     - If provided, must be unique.
-   type: str
-   required: false
- ip_address:
-   description:
-     - The IP you want to detach or attach.
-   type: str
-   required: false
+  server_hostname:
+    description:
+      - The hostname of the Server to act on.
+      - If provided, must be unique.
+    type: str
+    required: false
+
+  ip_address:
+    description:
+      - The IP you want to detach or attach.
+    type: str
+    required: false
 """
 
 EXAMPLES = r"""
 - name: Attach ip to Server by hostname
- pidginhost.cloud.ip_action:
-   token: "{{ pidgin_host_token }}"
-   server_hostname: hostname
-   server_ip: 23432
-   state: present
-   server_hostname: hostname
+  pidginhost.cloud.ip_action:
+    token: "{{ pidgin_host_token }}"
+    server_hostname: hostname
+    server_ip: 23432
+    state: present
 
 - name: Attach ip to Server by id
- pidginhost.cloud.ip_action:
-   token: "{{ pidgin_host_token }}"
-   server_hostname: hostname
-   server_ip: 23432
-   state: present
-   ip_address: 4234223
+  pidginhost.cloud.ip_action:
+    token: "{{ pidgin_host_token }}"
+    server_hostname: hostname
+    server_ip: 23432
+    state: present
+    ip_address: 4234223
 
 - name: Detach ip from Server
- pidginhost.cloud.ip_action:
-   token: "{{ pidgin_host_token }}"
-   state: absent
-   ip_address: 4234223
+  pidginhost.cloud.ip_action:
+    token: "{{ pidgin_host_token }}"
+    state: absent
+    ip_address: 4234223
 """
-RETURN = """
+RETURN = r"""
 ips:
   description: 
     - IPS info.
@@ -125,7 +125,7 @@ msg:
     - IP (IP) attached to (HOSTNAME)
     - IP (IP) will be detached from server (HOSTNAME)
     - IP (IP) detached from server (HOSTNAME)
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

@@ -31,7 +31,7 @@ EXAMPLES = r"""
     
 """
 
-RETURN = """
+RETURN = r"""
 account:
   description: 
     - Represents the information about storage products.
@@ -60,7 +60,7 @@ msg:
   sample:
     - Current account information
     - Current account information not found
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

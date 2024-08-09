@@ -132,45 +132,45 @@ options:
 
 EXAMPLES = r"""
 - name: Create Server
-pidginhost.cloud.server:
-  token: "{{ pidgin_host_token }}"
-  state: present
-  unique_hostname: true
-  image: string
-  package: string
-  hostname: string
-  project: string
-  password: string
-  ssh_pub_key: string
-  ssh_pub_key_id: string
-  public_ip: string
-  new_ipv4: true
-  public_ipv6: string
-  new_ipv6: true
-  fw_rules_set: string
-  fw_policy_in: ACCEPT
-  fw_policy_out: ACCEPT
-  private_network: string
-  private_address: 198.51.100.42
-  extra_volume_product: string
-  extra_volume_size: 0
-  no_network_acknowledged: true
+  pidginhost.cloud.server:
+    token: "{{ pidgin_host_token }}"
+    state: present
+    unique_hostname: true
+    image: string
+    package: string
+    hostname: string
+    project: string
+    password: string
+    ssh_pub_key: string
+    ssh_pub_key_id: string
+    public_ip: string
+    new_ipv4: true
+    public_ipv6: string
+    new_ipv6: true
+    fw_rules_set: string
+    fw_policy_in: ACCEPT
+    fw_policy_out: ACCEPT
+    private_network: string
+    private_address: 198.51.100.42
+    extra_volume_product: string
+    extra_volume_size: 0
+    no_network_acknowledged: true
 
 - name: Delete Server by server hostname
-pidginhost.cloud.server:
-  token: "{{ pidgin_host_token }}"
-  state: absent
-  unique_hostname: true
-  hostname: string
+  pidginhost.cloud.server:
+    token: "{{ pidgin_host_token }}"
+    state: absent
+    unique_hostname: true
+    hostname: string
 
 - name: Delete Server by server id
-pidginhost.cloud.server:
-  token: "{{ pidgin_host_token }}"
-  state: absent
-  server_id: true
+  pidginhost.cloud.server:
+    token: "{{ pidgin_host_token }}"
+    state: absent
+    server_id: true
 """
 
-RETURN = """
+RETURN = r"""
 server:
   description: 
     - Indicates the result of creating the server.
@@ -232,7 +232,7 @@ msg:
     - Must provide server_id when deleting Cloud Server without unique_hostname
     - Cloud Server with ID 3242 not found
     - Cloud Server with ID 23423 would be deleted
-  """
+"""
 
 import time
 from ansible.module_utils.basic import AnsibleModule

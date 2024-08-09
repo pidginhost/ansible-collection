@@ -24,32 +24,31 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 
 options:
- ip_type:
-   description:
-     - The IP type.
-   type: str
-   required: true
-   choices:
-    - ipv4
-    - ipv6
+  ip_type:
+    description:
+      - The IP type.
+    type: str
+    required: true
+    choices:
+      - ipv4
+      - ipv6
 """
 
 EXAMPLES = r"""
 - name: Print all ipv4 info
- pidginhost.cloud.ips_info:
-   state: present
-   token: "{{ pidgin_host_token }}"
-   ip_type: ipv4
-
+  pidginhost.cloud.ips_info:
+    state: present
+    token: "{{ pidgin_host_token }}"
+    ip_type: ipv4
 
 - name: Print all ipv6 info
- pidginhost.cloud.ips_info:
-   state: present
-   token: "{{ pidgin_host_token }}"
-   ip_type: ipv6
+  pidginhost.cloud.ips_info:
+    state: present
+    token: "{{ pidgin_host_token }}"
+    ip_type: ipv6
 """
 
-RETURN = """
+RETURN = r"""
 ips:
   description: 
     - IPS info.
@@ -95,7 +94,7 @@ msg:
   sample:
     - All IPV4 addresses info
     - All IPV6 addresses info
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

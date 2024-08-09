@@ -23,7 +23,17 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 
 """
-RETURN = """
+
+
+EXAMPLES = r"""
+- name: List all firewall on your account
+  pidginhost.cloud.firewalls_info:
+    token: "{{ pidgin_host_token }}"
+    state: present
+"""
+
+
+RETURN = r"""
 server:
   description: 
     - Firewalls data.
@@ -70,7 +80,7 @@ msg:
   sample:
     - Current firewalls
     - No firewalls.
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
