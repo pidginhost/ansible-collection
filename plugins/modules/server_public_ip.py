@@ -27,10 +27,10 @@ author:
 """
 EXAMPLES = r"""
 - name: Get specific server ip
- pidginhost.cloud.server_public_ip:
-   token: "{{ token }}"
-   state: present
-   server_hostname: "{{ server_hostname }}"
+  pidginhost.cloud.server_public_ip:
+    token: "{{ token }}"
+    state: present
+    server_hostname: "{{ server_hostname }}"
 """
 
 RETURN = """
@@ -43,6 +43,7 @@ server:
     changed: false
     failed: false
     server: 176.124.106.79
+
 error:
   description: PidginHost API error.
   returned: failure
@@ -51,6 +52,7 @@ error:
     Message: PidginHost API error, request to {url} failed.
     Response: response.text
     Status Code: response.status_code
+
 msg:
   description: Action information.
   returned: always
@@ -59,7 +61,7 @@ msg:
     - No Server named with hostname HOSTNAME
     - Multiple Servers (11) found, with hostname: (HOSTNAME)
     - Find Server id: 232 with ip address: IP_ADDRESS
-  """
+"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
