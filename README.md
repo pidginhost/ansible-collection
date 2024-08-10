@@ -6,6 +6,7 @@
          alt="PidginHost + Ansible"
          title="PidginHost + Ansible">
   </p>
+
 </div>
 
 
@@ -250,16 +251,3 @@ ansible-galaxy collection install pidginhost.cloud --upgrade
 GNU General Public License v3.0 or later.
 
 See [LICENSE](https://www.gnu.org/licenses/gpl-3.0.txt) to see the full text.
-
-<style>
-.image-container {
-  max-width: 100%;
-  height: auto;
-}
-
-@media screen and (max-width: 600px) {
-  .image-container img {
-    width: 100%;
-  }
-}
-</style>
