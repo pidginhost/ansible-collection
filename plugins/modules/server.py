@@ -142,10 +142,10 @@ EXAMPLES = r"""
     password: string
     ssh_pub_key: string
     ssh_pub_key_id: string
-    public_ip: string
     new_ipv4: true
-    public_ipv6: string
     new_ipv6: true
+    public_ip: string
+    public_ipv6: string
     fw_rules_set: string
     fw_policy_in: ACCEPT
     fw_policy_out: ACCEPT

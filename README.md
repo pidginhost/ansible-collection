@@ -61,6 +61,7 @@ requests
 |----------------------------|----------------------------------|
 | `pidginhost.cloud.servers` | Servers dynamic inventory plugin |
 
+
 ## Using this collection
 
 There are sample playbooks in the [playbooks](playbooks) directory.
@@ -106,9 +107,6 @@ PLAY RECAP *********************************************************************
 localhost                  : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
 ```
 
-> [!NOTE]
-> PidginHost does not require Server hostname to be unique - this functionality is enforced by the
-> `pidginhost.cloud.server` module in conjunction with its `unique_hostname` parameter.
 
 [This](inventoryidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
 
@@ -152,6 +150,63 @@ Output should look similar to the following:
 }
 
 ```
+
+## Getting started creating a simple server
+
+> [!NOTE]
+> PidginHost does not require Server hostname to be unique - this functionality is enforced by the
+> `pidginhost.cloud.server` module in conjunction with its `unique_hostname` parameter.
+
+
+Get packages:
+```shell
+ansible localhost -m pidginhost.cloud.packages_info
+```
+Get images:
+```shell
+ansible localhost -m pidginhost.cloud.images_info
+```
+
+Next fill in the needed details like in the bellow example
+
+"Only 'image' and 'package' are mandatory parameters. The other parameters are optional. You must provide 'password' or 'ssh_pub_key', or both. Failure to include either will result in an error, preventing the server creation."
+
+Check documentation:
+
+```shell
+ansible-doc pidginhost.cloud.server
+```
+
+```yaml
+---
+- name: Create or delete Servers
+  hosts: localhost
+  tasks:
+    - name: Create Server
+      pidginhost.cloud.server:
+        state: present
+        unique_hostname: true
+        image: string
+        package: string
+        hostname: string
+        project: string
+        password: string
+        ssh_pub_key: string
+        ssh_pub_key_id: string
+        new_ipv4: true
+        new_ipv6: true
+        public_ip: string
+        public_ipv6: string
+        fw_rules_set: string
+        fw_policy_in: ACCEPT
+        fw_policy_out: ACCEPT
+        private_network: string
+        private_address: 198.51.100.42
+        extra_volume_product: string
+        extra_volume_size: 0
+        no_network_acknowledged: true
+```
+
 
 ### Installing the Collection from Ansible Galaxy
 
