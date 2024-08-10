@@ -76,7 +76,7 @@ within your playbook.
 > **Warning**
 > Keep in mind, running the sample playbooks that create cloud resources will cost real money.
 
-[This](playbooksrofile_info.yml) is a sample playbook which returns your PidginHost account information:
+[This](playbooks/profile_info.yml) is a sample playbook which returns your PidginHost account information:
 
 ```yaml
 ---
@@ -111,7 +111,7 @@ localhost                  : ok=1    changed=0    unreachable=0    failed=0    s
 ```
 
 
-[This](inventoryidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
+[This](inventory/pidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
 
 Output should look similar to the following:
 
