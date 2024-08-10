@@ -27,12 +27,13 @@ EXAMPLES = r"""
 - name: Print SSH Keys info
   pidginhost.cloud.ssh_keys_info:
     state: present
-    token: "{{ pidgin_host_token }}"
   register: result
 """
 
 RETURN = r"""
 ssh_keys:
+  description: 
+    - Print SSH Keys info.
   changed: false
   failed: false
   ssh_keys:

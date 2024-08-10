@@ -34,12 +34,12 @@ options:
   rules_set_name:
     description:
       - A human-readable name for a firewall rules set.
-      - The name must be no more the 200 characters long.
+      - The name must be no more than 200 characters long.
     type: str
     required: true
   direction:
     description:
-      - Specifies that the rule is for incoming traffic: IN, OUT.
+      - Specifies that the rule is for incoming traffic (IN, OUT.)
     type: str
     required: false
   action:
@@ -77,7 +77,6 @@ options:
       - Indicates whether the rule is enabled (true) or disabled (false).
     type: bool
     required: false
-    
   position:
     description:
       - Determines the position of the rule in the rule set, possibly based on priority or rule order.
@@ -88,20 +87,17 @@ options:
 EXAMPLES = r"""
 - name: Delete firewall (rules set)
   pidginhost.cloud.firewall:
-    token: "{{ pidgin_host_token }}"
     state: absent
     rules_set_name: Firewall rules set name
-    
+
 - name: Create firewall (rules set)
   pidginhost.cloud.firewall:
-    token: "{{ pidgin_host_token }}"
     state: present
     create_rules_set: true
     rules_set_name: Firewall rules set name
 
 - name: Add firewall rules to (rules set)
   pidginhost.cloud.firewall:
-    token: "{{ pidgin_host_token }}"
     state: present
     rules_set_name: New Firewall1
     create_rules_set: false
@@ -119,7 +115,7 @@ EXAMPLES = r"""
 RETURN = r"""
 firewall:
   description:
-    - Create firewall (rules set)
+    - Create firewall rules set
   type: dict
   returned: always
   sample:
@@ -138,7 +134,7 @@ firewall:
       state: present
       timeout: 300
       token: VALUE_SPECIFIED_IN_NO_LOG_PARAMETER
-    
+
 error:
   description: PidginHost API error.
   returned: failure

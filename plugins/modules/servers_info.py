@@ -27,16 +27,17 @@ author:
 EXAMPLES = r"""
 - name: Print Servers info
   pidginhost.cloud.servers_info:
-    token: "{{ token }}"
     state: present
 """
 
 RETURN = r"""
 servers:
+  description: 
+    - List all Servers info.
   changed: false
   failed: false
   msg: "All Servers info."
-  servers:
+  sample:
     cpus: 2
     disk_size: 64
     hostname: "hhtest22332.com"
@@ -48,7 +49,7 @@ servers:
       public:
         interface: "eth0"
         ipv4: "176.124.106.104"
-        ipv6: "2001:67c:744:1::22"
+        ipv6: ""
     package: "cloudv-3"
     project: "z5"
     status: "active"
@@ -58,7 +59,7 @@ error:
   returned: failure
   type: dict
   sample:
-    Message: PidginHost API error, request to {url} failed.
+    Message: PidginHost API error, request to URL failed.
     Response: response.text
     Status Code: response.status_code
 msg:
@@ -66,7 +67,7 @@ msg:
   returned: always
   type: str
   sample:
-    - All Servers info..
+    - All Servers info.
     - No Server info.
 """
 

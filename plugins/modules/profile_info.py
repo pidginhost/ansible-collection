@@ -27,7 +27,6 @@ EXAMPLES = r"""
 - name: Print public interface
   pidginhost.cloud.profile_info:
     state: present
-    token: "{{ pidgin_host_token }}"
     
 """
 

@@ -47,7 +47,6 @@ options:
 EXAMPLES = r"""
 - name: Add public interface to server
   pidginhost.cloud.firewall_action:
-    token: "{{ pidginhost_token }}"
     state: present
     policy_in: ACCEPT
     policy_out: ACCEPT

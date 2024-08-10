@@ -1,6 +1,8 @@
-#short_description: Print PidginHost profile info.
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/profile_info.yml -v
+
 - name: Get PidginHost profile info
   hosts: localhost
   connection: local

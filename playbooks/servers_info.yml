@@ -1,26 +1,13 @@
-#short_description: Print Servers info.
-
-#EXAMPLES
-#- name: Print all Servers info
-#  pidginhost.cloud.servers_info:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/servers_info.yml -v
+
 - name: Print all Servers info
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-
+  gather_facts: false
   tasks:
     - name: Print all Servers info
       pidginhost.cloud.servers_info:
         state: present
-        token: "{{ pidgin_host_token }}"
-      register: result
-
-    - debug:
-        msg: "{{ result }}"

@@ -1,44 +1,18 @@
-#short_description: Print Volumes info.
-
-#description:
-#  - Print all Volumes info.
-#  - Print volumes info for specific Server id.
-
-#options:
-#  server_id:
-#    description:
-#      - The ID of the Server.
-#    type: int
-#    required: false
-
-#EXAMPLES
-#- name: Print all volumes info
-#  pidginhost.cloud.volumes_info:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#
-#
-#- name: Print volumes info for specific Server id
-#  pidginhost.cloud.volumes_info:
-#    state: present
-#    server_id: 23423
-#    token: "{{ pidgin_host_token }}"
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/volumes_info.yml -v
+
 - name: Get Cloud server volumes info
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-
+  gather_facts: false
   tasks:
     - name: Print all volumes info
       pidginhost.cloud.volumes_info:
         state: present
-        token: "{{ pidgin_host_token }}"
-      register: result
 
-    - debug:
-        msg: "{{ result }}"
+    - name: Print volumes info for specific Server id
+      pidginhost.cloud.volumes_info:
+        state: present
+        server_id: 23423

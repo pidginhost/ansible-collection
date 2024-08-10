@@ -42,14 +42,12 @@ options:
 EXAMPLES = r"""
 - name: Attach volume to Server
   pidginhost.cloud.volume_action:
-    token: "{{ token }}"
     state: present
     volume_alias: alias
     server_hostname: hostname.com
 
 - name: Detach volume from Server
   pidginhost.cloud.volume_action:
-    token: "{{ token }}"
     state: absent
     volume_alias: alias
     server_hostname: hostname.com
@@ -85,13 +83,13 @@ msg:
   returned: always
   type: str
   sample:
-    - No detached volume with alias: ALIAS
+    - No detached volume with alias ALIAS
     - Multiple detached volumes 10 with alias ALIAS
     - Multiple attached volumes 10 with alias ALIAS
     - Multiple Servers 10 found, with hostname: HOSTNAME
-    - Volume alias : (ALIAS) id : (191) would be attached to (HOSTNAME) 
+    - Volume alias  (ALIAS) id  (191) would be attached to (HOSTNAME) 
     - Attached volume (ALIAS) to (HOSTNAME)
-    - Volume alias : (ALIAS) id : (191) would be detached from (HOSTNAME)
+    - Volume alias  (ALIAS) id  (191) would be detached from (HOSTNAME)
     - No attached volume with alias: ALIAS
 """
 

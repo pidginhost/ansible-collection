@@ -1,169 +1,45 @@
-#short_description: Create or delete Servers.
-
-# NOTE: PidginHost Server hostname are not required to be unique!
-
-#options:
-#  hostname:
-#    description:
-#      - The human-readable string you wish to use when displaying the Server hostname.
-#    type: str
-#    required: false
-#  image:
-#    description:
-#      - Specifies the image or template to be used for the server.
-#    type: str
-#    required: false
-#  package:
-#    description:
-#      - Specifies the server's package.
-#    type: str
-#    required: false
-#  project:
-#    description:
-#      - The project or group the server will be associated with.
-#    type: str
-#    required: false
-#  password:
-#    description:
-#      - The password to be used for server authentication.
-#    type: str
-#    required: false
-#  ssh_pub_key:
-#    description:
-#      - The SSH public key for server access.
-#    type: str
-#    required: false
-#  ssh_pub_key_id:
-#    description:
-#      - An identifier for the SSH public key.
-#    type: str
-#    required: false
-#  public_ip:
-#    description:
-#      - The public IPv4 address to be assigned to the server.
-#    type: str
-#    required: false
-#  new_ipv4:
-#    description:
-#      - A boolean to indicate whether a new IPv4 address should be assigned.
-#    type: bool
-#    required: false
-#  public_ipv6:
-#    description:
-#      - The public IPv6 address to be assigned to the server.
-#    type: str
-#    required: false
-#  new_ipv6:
-#    description:
-#      - A boolean to indicate whether a new IPv6 address should be assigned.
-#    type: bool
-#    required: false
-#  fw_rules_set:
-#    description:
-#      - The firewall rules set to be applied to the server.
-#    type: str
-#  fw_policy_in:
-#    description:
-#      - The firewall policy for incoming traffic (default is "ACCEPT").
-#    type: str
-#    required: false
-#  fw_policy_out:
-#    description:
-#      - The firewall policy for outgoing traffic (default is "ACCEPT").
-#    type: str
-#    required: false
-#  private_network:
-#    description:
-#      - The private network the server should be connected to.
-#    type: str
-#    required: false
-#  private_address:
-#    description:
-#      - The private IPv4 address for the server.
-#    type: str
-#    required: false
-#  private_address:
-#    description:
-#      - Additional volume type for the server.
-#    type: str
-#    required: false
-#  extra_volume_size:
-#    description:
-#      - Size of the additional volume.
-#    type: str
-#    required: false
-#  no_network_acknowledged:
-#    description:
-#      - A boolean confirming network settings.
-#    type: bool
-#    required: false
-#  unique_hostname:
-#    description:
-#      - |
-#        When C(true) for C(state=present) the Server will only be created if it has uniq hostname.
-#      - |
-#        When C(true) for C(state=absent) the Server will only be destroyed if it has uniq hostname.
-#    type: bool
-#    required: false
-#    default: false
-
-#EXAMPLES
-#- name: Create Server
-#  pidginhost.cloud.server:
-#    token: "{{ pidgin_host_token }}"
-#    state: present
-#    unique_hostname: true
-#    image: string
-#    package: string
-#    hostname: string
-#    project: string
-#    password: string
-#    ssh_pub_key: string
-#    ssh_pub_key_id: string
-#    public_ip: string
-#    new_ipv4: true
-#    public_ipv6: string
-#    new_ipv6: true
-#    fw_rules_set: string
-#    fw_policy_in: ACCEPT
-#    fw_policy_out: ACCEPT
-#    private_network: string
-#    private_address: 198.51.100.42
-#    extra_volume_product: string
-#    extra_volume_size: 0
-#    no_network_acknowledged: true
-
-#- name: Delete Server by server hostname
-#  pidginhost.cloud.server:
-#    token: "{{ pidgin_host_token }}"
-#    state: absent
-#    unique_hostname: true
-#    hostname: string
-
-#- name: Delete Server by server id
-#  pidginhost.cloud.server:
-#    token: "{{ pidgin_host_token }}"
-#    state: absent
-#    server_id: true
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/server.yml -v
+
 - name: Create or delete Servers
   hosts: localhost
-  vars:
-
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-    ssh_pub_key: "ssh-rsa +Y8if4SLWfGcCCzAi7mM+//EUGJca0DP46f/++n4ZESF5IWQ2//9FrlVr81hVWDe6pOz3BH2M70oIebQv"
-
   tasks:
     - name: Create Server
       pidginhost.cloud.server:
         token: "{{ pidgin_host_token }}"
         state: present
         unique_hostname: true
-        image: ubuntu22
-        package: cloudv-5
-        hostname: asdfsadfdsa
-        password: afdsfsfsfsf
-      register: result
-    - debug:
-        msg: "{{ result }}"
+        image: string
+        package: string
+        hostname: string
+        project: string
+        password: string
+        ssh_pub_key: string
+        ssh_pub_key_id: string
+        public_ip: string
+        new_ipv4: true
+        public_ipv6: string
+        new_ipv6: true
+        fw_rules_set: string
+        fw_policy_in: ACCEPT
+        fw_policy_out: ACCEPT
+        private_network: string
+        private_address: 198.51.100.42
+        extra_volume_product: string
+        extra_volume_size: 0
+        no_network_acknowledged: true
+
+    - name: Delete Server by server hostname
+      pidginhost.cloud.server:
+        token: "{{ pidgin_host_token }}"
+        state: absent
+        unique_hostname: true
+        hostname: string
+
+    - name: Delete Server by server id
+      pidginhost.cloud.server:
+        token: "{{ pidgin_host_token }}"
+        state: absent
+        server_id: true

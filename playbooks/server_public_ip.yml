@@ -1,28 +1,14 @@
-#short_description: Get specific server ip
-
-#EXAMPLES
-#- name: Get specific server ip
-# pidginhost.cloud.server_public_ip:
-#   token: "{{ token }}"
-#   state: present
-#   server_hostname: "{{ server_hostname }}"
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/server_public_ip.yml -v
+
 - name: Get specific server ip
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-
+  gather_facts: false
   tasks:
     - name: Get specific server ip
       pidginhost.cloud.server_public_ip:
         state: present
-        token: "{{ pidgin_host_token }}"
         server_hostname: UixUhRmLMCCUdcj
-      register: result
-
-    - debug:
-        msg: "{{ result }}"

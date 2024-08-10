@@ -1,61 +1,42 @@
-#short_description: Resize a Server Volume or upgrade Server package
-
-#EXAMPLES
-#- name: Resize a Server Volume by hostname
-#  pidginhost.cloud.server_action_resize:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#    server_hostname: hhtest22332.com
-#    disk: true
-#    size_gigabytes: 60
-#    volume_alias: Volume4444
-#    product: fast-storage
-
-#- name: Resize a Server Volume by id
-#  pidginhost.cloud.server_action_resize:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#    server_id: 23423
-#    disk: true
-#    size_gigabytes: 60
-#    volume_alias: Volume4444
-#    product: fast-storage
-
-#- name: Upgrade Server package by hostname
-#  pidginhost.cloud.server_action_resize:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#    server_hostname: hhtest22332.com
-#    disk: false
-#    package_name: cloudv-3
-
-#- name: Upgrade Server package by id
-#  pidginhost.cloud.server_action_resize:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#    server_id: 234234
-#    disk: false
-#    package_name: cloudv-3
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/server_action_resize.yml -v
+
 - name: Resize a Server Volume or upgrade Server package
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+  gather_facts: false
 
   tasks:
-    - name: Upgrade Server package
+    - name: Resize a Server Volume by hostname
       pidginhost.cloud.server_action_resize:
         state: present
-        token: "{{ pidgin_host_token }}"
         server_hostname: hhtest22332.com
         disk: true
         size_gigabytes: 60
         volume_alias: Volume4444
         product: fast-storage
-      register: result
 
-    - debug:
-        msg: "{{ result }}"
+    - name: Resize a Server Volume by id
+      pidginhost.cloud.server_action_resize:
+        state: present
+        server_id: 23423
+        disk: true
+        size_gigabytes: 60
+        volume_alias: Volume4444
+        product: fast-storage
+
+    - name: Upgrade Server package by hostname
+      pidginhost.cloud.server_action_resize:
+        state: present
+        server_hostname: hhtest22332.com
+        disk: false
+        package_name: cloudv-3
+
+    - name: Upgrade Server package by id
+      pidginhost.cloud.server_action_resize:
+        state: present
+        server_id: 234234
+        disk: false
+        package_name: cloudv-3

@@ -45,7 +45,6 @@ EXAMPLES = r"""
   pidginhost.cloud.ssh_key:
     state: present
     delete_others: false
-    token: "{{ pidgin_host_token }}"
     ssh_pub_key: "{{ item }}"
   with_items: "{{ keys_list }}"
   when: not delete_others
@@ -54,7 +53,6 @@ EXAMPLES = r"""
   pidginhost.cloud.ssh_key:
     state: absent
     delete_others: false
-    token: "{{ pidgin_host_token }}"
     ssh_pub_key: "{{ item }}"
   with_items: "{{ keys_list }}"
   when: not delete_others
@@ -63,15 +61,16 @@ EXAMPLES = r"""
   pidginhost.cloud.ssh_key:
     state: present
     delete_others: true
-    token: "{{ pidgin_host_token }}"
     ssh_pub_key: "{{ keys_list }}"
   when: delete_others == true and state == 'present'
 """
 
 RETURN = r"""
 ssh_key:
+  description: 
+    - Add SSH keys.
   changed: true
-  results:
+  sample:
     - added_keys: []
       ansible_loop_var: "item"
       changed: true
@@ -103,15 +102,15 @@ msg:
   returned: always
   type: str
   sample:
-    - SSH key SSH_KEY fingerprint : (FINGERPRINT) is deleted.
+    - SSH key SSH_KEY fingerprint  (FINGERPRINT) is deleted.
     - Keys will be added to Cloud.
     - SSH Pub Key SSH_KEY already exists on cloud
     - Keys have been added to Cloud.
     - SSH Pub Key will be added to cloud
     - SSH Pub Key successfully added to cloud
-    - You need to chose (state: present) if you have (delete_others: true)
+    - You need to chose (state present) if you have (delete_others true)
     - SSH key SSH_KEY does not exist
-    - SSH key SSH_KEY fingerprint : (FINGERPRINT) would be deleted
+    - SSH key SSH_KEY fingerprint  (FINGERPRINT) would be deleted
 deleted_msg:
   description: Keys deleted information.
   returned: always

@@ -66,7 +66,6 @@ options:
 EXAMPLES = r"""
 - name: Add volume to Server
   pidginhost.cloud.volume:
-    token: "{{ pidgin_host_token }}"
     state: present
     project: "str"
     product: "fast-storage"
@@ -76,7 +75,6 @@ EXAMPLES = r"""
 
 - name: Delete volume
   pidginhost.cloud.volume:
-    token: "{{ pidgin_host_token }}"
     state: absent
     volume_alias: alias
 """
@@ -113,13 +111,13 @@ msg:
   type: str
   sample:
     - Deleted volume (VOLUME_ALIAS).
-    - No Product named PRODUCT, available products: LIST_OF_ALL_PRODUCTS.
+    - No Product named PRODUCT, available products LIST_OF_ALL_PRODUCTS.
     - No Server named with hostname HOSTNAME.
-    - Multiple Servers (11) found, with hostname: (HOSTNAME)
+    - Multiple Servers (11) found, with hostname (HOSTNAME)
     - No detached volume with alias VOLUME_ALIAS
     - Multiple detached volumes (11) with alias (VOLUME_ALIAS)
-    - Volume will be added to (HOSTNAME) with id : (11)
-    - Add volume to (VOLUME_ALIAS) attached to server: (HOSTNAME) with id : (1212)
+    - Volume will be added to (HOSTNAME) with id  (11)
+    - Add volume to (VOLUME_ALIAS) attached to server (HOSTNAME) with id  (1212)
     - Volume (VOLUME_ALIAS) would be deleted
 """
 

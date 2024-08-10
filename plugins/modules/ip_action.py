@@ -53,14 +53,12 @@ options:
 EXAMPLES = r"""
 - name: Attach ip to Server by hostname
   pidginhost.cloud.ip_action:
-    token: "{{ pidgin_host_token }}"
     server_hostname: hostname
     server_ip: 23432
     state: present
 
 - name: Attach ip to Server by id
   pidginhost.cloud.ip_action:
-    token: "{{ pidgin_host_token }}"
     server_hostname: hostname
     server_ip: 23432
     state: present
@@ -68,7 +66,6 @@ EXAMPLES = r"""
 
 - name: Detach ip from Server
   pidginhost.cloud.ip_action:
-    token: "{{ pidgin_host_token }}"
     state: absent
     ip_address: 4234223
 """

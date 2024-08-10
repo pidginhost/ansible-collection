@@ -133,7 +133,6 @@ options:
 EXAMPLES = r"""
 - name: Create Server
   pidginhost.cloud.server:
-    token: "{{ pidgin_host_token }}"
     state: present
     unique_hostname: true
     image: string
@@ -158,14 +157,12 @@ EXAMPLES = r"""
 
 - name: Delete Server by server hostname
   pidginhost.cloud.server:
-    token: "{{ pidgin_host_token }}"
     state: absent
     unique_hostname: true
     hostname: string
 
 - name: Delete Server by server id
   pidginhost.cloud.server:
-    token: "{{ pidgin_host_token }}"
     state: absent
     server_id: true
 """

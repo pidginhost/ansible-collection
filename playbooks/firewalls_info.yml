@@ -1,20 +1,14 @@
-#List all firewall on your account.
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/firewalls_info.yml -v
+
 - name: List all firewall on your account
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+  gather_facts: false
 
   tasks:
     - name: Print all firewalls data
       pidginhost.cloud.firewalls_info:
         state: present
-        token: "{{ pidgin_host_token }}"
-      register: result
-
-    - debug:
-        msg: "{{ result }}"

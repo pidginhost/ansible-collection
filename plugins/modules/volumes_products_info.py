@@ -26,7 +26,6 @@ EXAMPLES = r"""
 - name: Print all volumes Products
   pidginhost.cloud.volumes_products_info:
     state: present
-    token: "{{ pidgin_host_token }}"
   register: result
 """
 

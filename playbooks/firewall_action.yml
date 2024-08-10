@@ -1,49 +1,16 @@
-#short_description: Add public interface to server.
-
-#options:
-#  server_hostname:
-#    description:
-#      - Server hostname.
-#    type: str
-#    required: true
-#  rules_set_name:
-#    description:
-#      - Rules set name.
-#    type: str
-#    required: true
-#  policy_in:
-#    description:
-#      - Defines the action to be taken for incoming traffic, such as ACCEPT, REJECT, DROP.
-#    type: str
-#    required: true
-#  policy_out:
-#    description:
-#      - Defines the action to be taken for incoming traffic, such as ACCEPT, REJECT, DROP.
-#    type: str
-#    required: true
-
-#EXAMPLES
-#- name: Add public interface to server
-#  pidginhost.cloud.firewall_action:
-#    token: "{{ pidginhost_token }}"
-#    state: present
-#    policy_in: ACCEPT
-#    policy_out: ACCEPT
-#    server_hostname: hostname
-#    rules_set_name: name
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/firewall_action.yml -v
+
 - name: Add public interface to server.
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+  gather_facts: false
 
   tasks:
-    - name: Delete firewall rules set
+    - name: Add public interface
       pidginhost.cloud.firewall_action:
-        token: "{{ pidgin_host_token }}"
         state: present
         policy_in: ACCEPT
         policy_out: ACCEPT

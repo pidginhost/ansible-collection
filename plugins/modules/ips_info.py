@@ -38,13 +38,11 @@ EXAMPLES = r"""
 - name: Print all ipv4 info
   pidginhost.cloud.ips_info:
     state: present
-    token: "{{ pidgin_host_token }}"
     ip_type: ipv4
 
 - name: Print all ipv6 info
   pidginhost.cloud.ips_info:
     state: present
-    token: "{{ pidgin_host_token }}"
     ip_type: ipv6
 """
 

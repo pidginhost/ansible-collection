@@ -1,35 +1,19 @@
-#short_description: Print IPS info.
-
-#description:
-#  - Print IPV4 info.
-#  - Print IPV6 info.
-
-#EXAMPLES
-#- name: Print all ipv4 info
-#  pidginhost.cloud.ips_info:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#    ip_type: ipv4
-#
-#
-#- name: Print all ipv6 info
-#  pidginhost.cloud.ips_info:
-#    state: present
-#    token: "{{ pidgin_host_token }}"
-#    ip_type: ipv6
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/ips_info.yml -v
+
 - name: Get IPS info
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-
+  gather_facts: false
   tasks:
     - name: Print all ipv4 info
       pidginhost.cloud.ips_info:
         state: present
-        token: "{{ pidgin_host_token }}"
         ip_type: ipv4
+
+    - name: Print all ipv6 info
+      pidginhost.cloud.ips_info:
+        state: present
+        ip_type: ipv6

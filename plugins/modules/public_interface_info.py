@@ -29,7 +29,6 @@ EXAMPLES = r"""
   pidginhost.cloud.public_interface_info:
     state: present
     server_id: 624
-    token: "{{ pidgin_host_token }}"
 """
 
 RETURN = r"""

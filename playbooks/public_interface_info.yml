@@ -1,31 +1,15 @@
-#short_description: Get Public Interface information for specific server.
-
-#description:
-#  - Get Public Interface information for specific server.
-
-#EXAMPLES
-#- name: Print public interface
-#  pidginhost.cloud.public_interface_info:
-#    state: present
-#    server_id: 624
-#    token: "{{ pidgin_host_token }}"
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/public_interface_info.yml -v
+
 - name: Print public interface
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-
+  gather_facts: false
   tasks:
     - name: Print volumes info for specific Server id
       pidginhost.cloud.public_interface_info:
         state: present
         server_id: 707
-        token: "{{ pidgin_host_token }}"
       register: result
-
-    - debug:
-        msg: "{{ result }}"

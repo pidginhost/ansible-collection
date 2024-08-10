@@ -28,13 +28,12 @@ author:
 EXAMPLES = r"""
 - name: List all firewall on your account
   pidginhost.cloud.firewalls_info:
-    token: "{{ pidgin_host_token }}"
     state: present
 """
 
 
 RETURN = r"""
-server:
+firewalls:
   description: 
     - Firewalls data.
   type: dict

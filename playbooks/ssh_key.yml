@@ -1,55 +1,8 @@
-#short_description: Manipulate SSH Keys.
-
-#description:
-#  - Add all keys from "keys_list".
-#  - Delete all keys from "keys_list".
-#  - Add specified SSH keys from "keys_list" and delete any other SSH which are not in "keys_list".
-
-#options:
-#  delete_others:
-#    description:
-#      - Keep only the keys specified in "keys_list" and delete others.
-#    type: bool
-#    required: false
-#    choices:
-#     - true
-#     - false
-#  keys_list:
-#    description:
-#      - A list of keys, must contain at least one key.
-#    type: list
-#    required: true
-
-#EXAMPLES
-#  - name: Add SSH keys
-#    pidginhost.cloud.ssh_key:
-#      state: present
-#      delete_others: false
-#      token: "{{ pidgin_host_token }}"
-#      ssh_pub_key: "{{ item }}"
-#    with_items: "{{ keys_list }}"
-#    when: not delete_others
-#
-#  - name: Delete SSH keys
-#    pidginhost.cloud.ssh_key:
-#      state: absent
-#      delete_others: false
-#      token: "{{ pidgin_host_token }}"
-#      ssh_pub_key: "{{ item }}"
-#    with_items: "{{ keys_list }}"
-#    when: not delete_others
-#
-#  - name: Add specified SSH keys and delete any other SSH keys found based on the delete_others flag
-#    pidginhost.cloud.ssh_key:
-#      state: present
-#      delete_others: true
-#      token: "{{ pidgin_host_token }}"
-#      ssh_pub_key: "{{ keys_list }}"
-#    when: delete_others == true and state == 'present'
-
-
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/ssh_key.yml -v
+
 - name: Handle SSH keys
   hosts: localhost
   connection: local
@@ -58,32 +11,29 @@
   vars:
     state: present
     delete_others: false
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
     keys_list:
       - "ssh-ed25519 yrty/2EOZ40JU5paEHP7ejAO7PB ansible"
 
   tasks:
-        - name: Add or Delete SSH keys
-          pidginhost.cloud.ssh_key:
-            state: "{{ state }}"
-            delete_others: "{{ delete_others }}"
-            token: "{{ pidgin_host_token }}"
-            ssh_pub_key: "{{ item }}"
-          register: result
-          with_items: "{{ keys_list }}"
-          when: not delete_others
-        - name: Debug SSH key operation results
-          debug:
-            msg: "{{ result }}"
+    - name: Add SSH keys
+      pidginhost.cloud.ssh_key:
+        state: present
+        delete_others: false
+        ssh_pub_key: "{{ item }}"
+      with_items: "{{ keys_list }}"
+      when: not delete_others
 
-#    - name: Add specified SSH keys and delete any other SSH keys found based on the delete_others flag
-#      pidginhost.cloud.ssh_key:
-#        state: "{{ state }}"
-#        delete_others: "{{ delete_others }}"
-#        token: "{{ pidgin_host_token }}"
-#        ssh_pub_key: "{{ keys_list }}"
-#      register: result
-#      when: delete_others == true and state == 'present'
-#    - name: Debug SSH key operation results
-#      ansible.builtin.debug:
-#        result: "{{ result }}"
+    - name: Delete SSH keys
+      pidginhost.cloud.ssh_key:
+        state: absent
+        delete_others: false
+        ssh_pub_key: "{{ item }}"
+      with_items: "{{ keys_list }}"
+      when: not delete_others
+
+    - name: Add specified SSH keys and delete any other SSH keys found based on the delete_others flag
+      pidginhost.cloud.ssh_key:
+        state: present
+        delete_others: true
+        ssh_pub_key: "{{ keys_list }}"
+      when: delete_others == true and state == 'present'`

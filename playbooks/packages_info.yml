@@ -1,20 +1,13 @@
-#short_description: Print PidginHost Packages info.
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/packages_info.yml -v
+
 - name: Get PidginHost Packages info
   hosts: localhost
   connection: local
   gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-
   tasks:
     - name: Print all server packages data
       pidginhost.cloud.packages_info:
         state: present
-        token: "{{ pidgin_host_token }}"
-      register: result
-
-    - debug:
-        msg: "{{ result }}"

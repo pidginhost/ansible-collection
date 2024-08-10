@@ -1,72 +1,28 @@
-#short_description: Attach, detach IP from Server.
-
-#description:
-#  - Attach, detach IP from Server.
-#  - Attach, detach IP from Server.
-#  - First, the IP needs to be detached and then attached.
-#  - Each server may only have one IPv4 address attached, as well as one IPv6 address.
-
-#options:
-#  server_id:
-#    description:
-#      - A unique identifier for a Server instance.
-#      - If provided, `server_hostname` is ignored.
-#    type: int
-#    required: false
-#
-#  server_hostname:
-#    description:
-#      - The hostname of the Server to act on.
-#      - If provided, must be unique.
-#    type: str
-#    required: false
-#  ip_address:
-#    description:
-#      - The IP you want to detach or attach.
-#    type: str
-#    required: false
-
-#EXAMPLES
-#- name: Attach ip to Server by hostname
-#  pidginhost.cloud.ip_action:
-#    token: "{{ pidgin_host_token }}"
-#    server_hostname: hostname
-#    server_ip: 23432
-#    state: present
-#    server_hostname: hostname
-
-#- name: Attach ip to Server by id
-#  pidginhost.cloud.ip_action:
-#    token: "{{ pidgin_host_token }}"
-#    server_hostname: hostname
-#    server_ip: 23432
-#    state: present
-#    ip_address: 4234223
-
-#- name: Detach ip from Server
-#  pidginhost.cloud.ip_action:
-#    token: "{{ pidgin_host_token }}"
-#    state: absent
-#    ip_address: 4234223
-
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/ip_action.yml -v
+
 - name: Attach or Detach volume from Server
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
-    ip_address: "1.1.2.3"
+  gather_facts: false
 
   tasks:
+    - name: Attach ip to Server by hostname
+      pidginhost.cloud.ip_action:
+        server_hostname: hostname
+        server_ip: 23432
+        state: present
+
+    - name: Attach ip to Server by id
+      pidginhost.cloud.ip_action:
+        server_hostname: hostname
+        server_ip: 23432
+        state: present
+        ip_address: 4234223
+
     - name: Detach ip from Server
       pidginhost.cloud.ip_action:
-        token: "{{ pidgin_host_token }}"
-        state: present
-        ip_address: "{{ ip_address }}"
-        server_hostname: hhtest4.com
-      register: result
-
-    - debug:
-        msg: "{{ result }}"
+        state: absent
+        ip_address: 4234223

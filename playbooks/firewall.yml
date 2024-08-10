@@ -1,106 +1,36 @@
-#short_description: Create firewalls rules set, add rules to rules set or delete rules set.
-
-#options:
-#  create_rules_set:
-#    description:
-#      - If you want to create a rules set.
-#    type: bool
-#    required: false
-#  rules_set_name:
-#    description:
-#      - A human-readable name for a firewall rules set.
-#      - The name must be no more the 200 characters long.
-#    type: str
-#    required: true
-#  direction:
-#    description:
-#      - Specifies that the rule is for incoming traffic: IN, OUT.
-#    type: str
-#    required: false
-#  action:
-#    description:
-#      - Defines the action to be taken for incoming traffic, such as ACCEPT, REJECT, DROP.
-#    type: str
-#    required: false
-#  protocol:
-#    description:
-#      - Specifies the network protocol (e.g., TCP, UDP) that the rule applies to.
-#    type: str
-#    required: false
-#  source:
-#    description:
-#      - Defines the source of the incoming traffic (e.g., IP address).
-#    type: str
-#    required: false
-#  sport:
-#    description:
-#      - Specifies the source port for the incoming traffic.
-#    type: str
-#    required: false
-#  destination:
-#    description:
-#      - Specifies the destination of the incoming traffic (e.g., IP address).
-#    type: str
-#    required: false
-#  dport:
-#    description:
-#      - Specifies the destination port for the incoming traffic.
-#    type: str
-#    required: false
-#  enabled:
-#    description:
-#      - Indicates whether the rule is enabled (true) or disabled (false).
-#    type: bool
-#    required: false
-#
-#  position:
-#    description:
-#      - Determines the position of the rule in the rule set, possibly based on priority or rule order.
-#    type: str
-#    required: false
-
-#EXAMPLES
-#- name: Delete firewall rules set
-#  pidginhost.cloud.firewall:
-#    token: "{{ pidginhost_token }}"
-#    state: absent
-#    rules_set_name: Firewall rules set name
-
-#- name: Create firewall rules set
-#  pidginhost.cloud.firewall:
-#    token: "{{ pidginhost_token }}"
-#    state: present
-#    create_rules_set: true
-#    rules_set_name: Firewall rules set name
-#
-#- name: Add firewall rules to rules set
-#  pidginhost.cloud.firewall:
-#    token: "{{ pidginhost_token }}"
-#    state: present
-#    rules_set_name: New Firewall1
-#    create_rules_set: false
-#    direction: in
-#    action: ACCEPT
-#    protocol: tcp
-#    source: str
-#    sport: str
-#    destination: str
-#    dport: 22
-#    enabled: true
-#    position: 0
 ---
+# code: language=ansible
+# Running this playbook:
+# ansible-playbook -i localhost playbooks/firewall.yml -v
+
 - name: Create firewalls rules set, add rules to rules set or delete rules set.
   hosts: localhost
   connection: local
-  gather_facts: true
-
-  vars:
-    pidgin_host_token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_ACCESS_TOKEN') }}"
+  gather_facts: false
 
   tasks:
     - name: Delete firewall rules set
       pidginhost.cloud.firewall:
-        token: "{{ pidgin_host_token }}"
         state: absent
+        rules_set_name: Firewall rules set name
+
+    - name: Create firewall rules set
+      pidginhost.cloud.firewall:
+        state: present
         create_rules_set: true
         rules_set_name: Firewall rules set name
+
+    - name: Add firewall rules to rules set
+      pidginhost.cloud.firewall:
+        state: present
+        rules_set_name: New Firewall1
+        create_rules_set: false
+        direction: in
+        action: ACCEPT
+        protocol: tcp
+        source: str
+        sport: str
+        destination: str
+        dport: 22
+        enabled: true
+        position: 0

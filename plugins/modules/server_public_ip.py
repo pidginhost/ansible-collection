@@ -34,9 +34,8 @@ options:
 EXAMPLES = r"""
 - name: Get specific server ip
   pidginhost.cloud.server_public_ip:
-    token: "{{ token }}"
     state: present
-    server_hostname: "{{ server_hostname }}"
+    server_hostname: hostname
 """
 
 RETURN = r"""
@@ -65,8 +64,8 @@ msg:
   type: str
   sample:
     - No Server named with hostname HOSTNAME
-    - Multiple Servers (11) found, with hostname: (HOSTNAME)
-    - Find Server id: 232 with ip address: IP_ADDRESS
+    - Multiple Servers (11) found, with hostname (HOSTNAME)
+    - Find Server id: 232 with ip address IP_ADDRESS
 """
 
 import time

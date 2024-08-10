@@ -28,13 +28,11 @@ EXAMPLES = r"""
 - name: Print all volumes info
   pidginhost.cloud.volumes_info:
     state: present
-    token: "{{ pidgin_host_token }}"
 
 - name: Print volumes info for specific Server id
   pidginhost.cloud.volumes_info:
     state: present
     server_id: 23423
-    token: "{{ pidgin_host_token }}"
 """
 
 RETURN = r"""
