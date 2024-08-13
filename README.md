@@ -110,6 +110,94 @@ PLAY RECAP *********************************************************************
 localhost                  : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
 ```
 
+[This](playbooks/create-server-install-nginx.yml) is a sample playbook file which create a server and install Nginx.:
+
+```shell
+ansible-playbook -i localhost playbooks/create-server-install-nginx.yml --ssh-common-args='-o StrictHostKeyChecking=no'
+```
+
+> [!NOTE]
+> `-o StrictHostKeyChecking=no`: This option sets `StrictHostKeyChecking` to `no`, which essentially disables SSH host key checking.
+
+```yaml
+---
+- name: Create Server and install Nginx
+  hosts: localhost
+  remote_user: phuser
+  tasks:
+    - name: Create Server
+      pidginhost.cloud.server:
+        state: present
+        unique_hostname: true
+        image: string
+        package: string
+        hostname: string
+        project: string
+        password: string
+        ssh_pub_key: string
+        ssh_pub_key_id: string
+        new_ipv4: true
+        new_ipv6: true
+        public_ip: string
+        public_ipv6: string
+        fw_rules_set: string
+        fw_policy_in: ACCEPT
+        fw_policy_out: ACCEPT
+        private_network: string
+        private_address: 198.51.100.42
+        extra_volume_product: string
+        extra_volume_size: 0
+        no_network_acknowledged: true
+      register: server_result
+
+    - name: Wait for server to become reachable
+      # Ansible module used to wait until a connection can be established with the target server.
+      wait_for_connection:
+        # Initial delay before the first check for connectivity.
+        delay: 10
+        # Time in seconds to wait between connection checks.
+        sleep: 10
+        # Maximum time in seconds to wait for the server to become reachable.
+        timeout: 300
+      delegate_to: "{{ server_result.server.networks.public.ipv4 }}"
+
+    - name: Install Nginx
+      # Instructs Ansible to perform the task on the specified target server.
+      delegate_to: "{{ server_result.server.networks.public.ipv4 }}"
+      # Executes the task with elevated privileges (usually as root or using sudo).
+      become: true
+      # Ansible's apt module used for package management on Debian-based systems.
+      ansible.builtin.apt:
+        # Specifies the package name to install (Nginx in this case).
+        name: nginx
+        # Ensures that the package is present on the system. If Nginx is not installed, it will be installed.
+        state: present
+        # Sets the maximum time in seconds to wait for the package lock. If a lock is held by another process, it waits for up to 600 seconds before timing out.
+        lock_timeout: 600
+```
+
+Output should look similar to the following:
+
+```shell
+❯ ansible-playbook -i localhost playbooks/create-server-install-nginx.yml --ssh-common-args='-o StrictHostKeyChecking=no'
+
+PLAY [Create Server and install Nginx] ********************************************************************************************************************************************************************************************************************************************************
+
+TASK [Gathering Facts] ************************************************************************************************************************************************************************************************************************************************************************
+ok: [localhost]
+
+TASK [Create Server] **************************************************************************************************************************************************************************************************************************************************************************
+changed: [localhost]
+
+TASK [Wait for server to become reachable] ****************************************************************************************************************************************************************************************************************************************************
+ok: [localhost -> 176.124.106.104]
+
+TASK [Install Nginx] **************************************************************************************************************************************************************************************************************************************************************************
+changed: [localhost -> 176.124.106.104]
+
+PLAY RECAP ************************************************************************************************************************************************************************************************************************************************************************************
+localhost                  : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0  
+```
 
 [This](inventory/pidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
 
@@ -209,7 +297,6 @@ ansible-doc pidginhost.cloud.server
         extra_volume_size: 0
         no_network_acknowledged: true
 ```
-
 
 ### Installing the Collection from Ansible Galaxy
 
