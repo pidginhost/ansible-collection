@@ -2,7 +2,7 @@
 # See https://docs.ansible.com/ansible/latest/dev_guide/collections_galaxy_meta.html
 namespace: pidginhost
 name: cloud
-version: "0.2.0"
+version: "0.3.0"
 readme: README.md
 authors:
   - Popescu Andrei Cristian (@shbpty)
