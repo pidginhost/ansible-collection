@@ -1,14 +1,29 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/server_public_ip.yml -v
-
-- name: Get specific server ip
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/server_public_ip.yml \
+#     -e "server_public_ip_hostname=my-host.example"
+- name: Retrieve server public IPv4
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    server_public_ip_hostname: null
+
   tasks:
-    - name: Get specific server ip
+    - name: Validate hostname input
+      ansible.builtin.assert:
+        that:
+          - server_public_ip_hostname is not none
+          - server_public_ip_hostname | length > 0
+        fail_msg: "Set server_public_ip_hostname to the target server hostname."
+
+    - name: Query public IPv4 address
       pidginhost.cloud.server_public_ip:
         state: present
-        server_hostname: UixUhRmLMCCUdcj
+        server_hostname: "{{ server_public_ip_hostname }}"
+      register: server_public_ip_result
+
+    - name: Show public IPv4
+      ansible.builtin.debug:
+        var: server_public_ip_result.server

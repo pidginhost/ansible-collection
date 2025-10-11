@@ -11,11 +11,13 @@ DOCUMENTATION = r"""
 name: servers
 author:
   - Popescu Andrei Cristian (@shbpty)
-  
+
 short_description: Servers dynamic inventory plugin
 version_added: "0.2.0"
 description:
   - Servers dynamic inventory plugin.
+  - Hosts missing a value for a keyed group are silently skipped instead of
+    raising an error, simplifying usage when optional metadata is absent.
 extends_documentation_fragment:
   - constructed
   - inventory_cache
@@ -42,7 +44,7 @@ options:
 """
 
 EXAMPLES = r"""
-plugin: pidginhost.cloud.droplets
+plugin: pidginhost.cloud.servers
 cache: true
 cache_plugin: ansible.builtin.jsonfile
 cache_connection: ./tmp/pidginhost_servers_inventory
@@ -81,14 +83,18 @@ groups:
   ubuntu: "'ubuntu' in image"
 """
 
-from ansible.module_utils.common.parameters import env_fallback
+import os
+from ansible.errors import AnsibleParserError
 from ansible.plugins.inventory import BaseInventoryPlugin, Cacheable, Constructable
 from ..module_utils.common import PidginHostsConstants, PidginHostCommonInventory
 
 
 class InventoryModule(BaseInventoryPlugin, Cacheable, Constructable):
     NAME = 'pidginhost.cloud.servers'  # used internally by Ansible, it should match the file name
-    TOKEN = env_fallback("PIDGINHOST_ACCESS_TOKEN", "PIDGINHOST_TOKEN")
+    TOKEN_ENV_VARS = (
+        "PIDGINHOST_ACCESS_TOKEN",
+        "PIDGINHOST_TOKEN",
+    )
     VALID_ENDSWITH = (
         "inventory.yml",
         "pidginhost.yml",
@@ -134,7 +140,7 @@ class InventoryModule(BaseInventoryPlugin, Cacheable, Constructable):
                 self.get_option('keyed_groups'),
                 host_vars,
                 host_name,
-                True,
+                False,  # skip missing/empty values instead of erroring out
             )
 
     def parse(self, inventory, loader, path, cache=True):
@@ -143,8 +149,16 @@ class InventoryModule(BaseInventoryPlugin, Cacheable, Constructable):
         config = self._read_config_data(path)
         token = self.templar.template(config.get("token"))
         if not token:
-            token = InventoryModule.TOKEN
-            config.update({"token": token})
+            for env_var in self.TOKEN_ENV_VARS:
+                token = os.getenv(env_var)
+                if token:
+                    break
+        if not token:
+            raise AnsibleParserError(
+                "PidginHost API token must be provided via the inventory 'token' option or "
+                "PIDGINHOST_TOKEN/PIDGINHOST_ACCESS_TOKEN environment variables."
+            )
+        config.update({"token": token})
 
         cache_key = self.get_cache_key(path)
         use_cache = self.get_option("cache") and cache

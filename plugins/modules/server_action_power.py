@@ -34,6 +34,8 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 options:
   server_id:
     description:
@@ -108,42 +110,6 @@ EXAMPLES = r"""
     server_id: 1122334455
 """
 
-RETURN = r"""
-action:
-  description: 
-    - Manipulate Servers action power.
-  type: dict
-  returned: always
-  sample:
-    changed: true
-    failed: false
-    action:
-      status: stopped
-
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Server HOSTNAME (2342) not sent action 'ACTION_TYPE', it is 'ACTION_STATUS'
-    - No Server named with hostname HOSTNAME
-    - Multiple Servers (232) found, with hostname: (HOSTNAME)
-    - Server HOSTNAME (2323) sent action 'ACTION_TYPE' and it has not completed, status is 'ACTION_STATUS'
-    - Server HOSTNAME (23423) sent action 'ACTION_TYPE'
-    - Server HOSTNAME (234) would be sent action 'ACTION_TYPE', it is 'ACTION_STATUS'
-    - Server HOSTNAME (23423) would be sent action 'ACTION_TYPE', it is 'ACTION_STATUS'
-    - Server HOSTNAME (2342) would not be sent action 'ACTION_TYPE', it is 'ACTION_STATUS'
-    - Server HOSTNAME (32432) not sent action 'ACTION_TYPE', it is 'ACTION_STATUS'
-    - Server HOSTNAME (32432) would be sent action 'ACTION_TYPE', it is 'ACTION_STATUS'.
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
@@ -435,8 +401,8 @@ class ServerActionPower(PidginHostCommonModule):
 def main():
     argument_spec = PidginHostOptions.argument_spec()
     argument_spec.update(
-        server_id=dict(type="int", required_one_of=["hostname", "server_id"]),
-        server_hostname=dict(type="str", required_one_of=["hostname", "server_id"]),
+        server_id=dict(type="int", required=False),
+        server_hostname=dict(type="str", required=False),
         state=dict(
             type="str",
             choices=["start", "stop", "shutdown", "reboot"],
@@ -449,6 +415,7 @@ def main():
         required_if=[
             ("state", "shutdown", ["force_power_off"]),
         ],
+        required_one_of=[("server_id", "server_hostname")],
     )
 
     ServerActionPower(module)

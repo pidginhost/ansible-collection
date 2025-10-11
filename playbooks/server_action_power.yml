@@ -1,60 +1,49 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/server_action_power.yml -v
-
-- name: Manage Server power action
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/server_action_power.yml \
+#     -e "server_power_state=shutdown \
+#         server_power_hostname=my-host.example"
+- name: Control server power state
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    server_power_state: shutdown          # start|stop|shutdown|reboot
+    server_power_hostname: null
+    server_power_id: null
+    server_force_power_off: false
+    server_power_timeout: 300
+
   tasks:
-    - name: Power off a Cloud Server by hostname
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: stop
-        server_hostname: hostname
+    - name: Validate target input
+      ansible.builtin.assert:
+        that:
+          - server_power_hostname is not none or server_power_id is not none
+        fail_msg: "Provide either server_power_hostname or server_power_id to target a server."
 
-    - name: Power off a Cloud Server by id
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: stop
-        server_id: 1122334455
+    - name: Build server power arguments
+      ansible.builtin.set_fact:
+        server_power_args: "{{ {
+          'state': server_power_state,
+          'force_power_off': server_force_power_off | bool,
+          'timeout': server_power_timeout | int
+        } }}"
 
-    - name: Power on a Cloud Server by hostname
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: start
-        server_hostname: hostname
+    - name: Include power target by hostname
+      ansible.builtin.set_fact:
+        server_power_args: "{{ server_power_args | combine({'server_hostname': server_power_hostname}) }}"
+      when: server_power_hostname is not none
 
-    - name: Power on a Cloud Server id
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: start
-        server_id: 1122334455
+    - name: Include power target by id
+      ansible.builtin.set_fact:
+        server_power_args: "{{ server_power_args | combine({'server_id': server_power_id}) }}"
+      when: server_power_id is not none
 
-    - name: Reboot a Cloud Server by hostname
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: reboot
-        server_hostname: hostname
+    - name: Apply power action
+      pidginhost.cloud.server_action_power: "{{ server_power_args }}"
+      register: server_power_result
 
-    - name: Reboot a Cloud Server by id
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: reboot
-        server_id: 1122334455
-
-    - name: Shut down a Cloud Server (force if unsuccessful) by hostname
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: shutdown
-        force_power_off: true
-        server_hostname: hostname
-
-    - name: Shut down a Cloud Server (force if unsuccessful) by id
-      pidginhost.cloud.server_action_power:
-        token: "{{ token }}"
-        state: shutdown
-        force_power_off: true
-        server_id: 1122334455
+    - name: Show power action result
+      ansible.builtin.debug:
+        var: server_power_result.action

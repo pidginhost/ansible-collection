@@ -1,18 +1,23 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/volumes_info.yml -v
-
-- name: Get Cloud server volumes info
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/volumes_info.yml \
+#     -e "volumes_server_id=12345"
+- name: Retrieve volume information
   hosts: localhost
   connection: local
   gather_facts: false
-  tasks:
-    - name: Print all volumes info
-      pidginhost.cloud.volumes_info:
-        state: present
 
-    - name: Print volumes info for specific Server id
+  vars:
+    volumes_state: present
+    volumes_server_id: null
+
+  tasks:
+    - name: Query volumes
       pidginhost.cloud.volumes_info:
-        state: present
-        server_id: 23423
+        state: "{{ volumes_state }}"
+        server_id: "{{ volumes_server_id | default(omit, true) }}"
+      register: volumes_result
+
+    - name: Show volumes
+      ansible.builtin.debug:
+        var: volumes_result.volumes

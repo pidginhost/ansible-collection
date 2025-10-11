@@ -23,6 +23,8 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 options:
   ip_type:
     description:
@@ -46,53 +48,6 @@ EXAMPLES = r"""
     ip_type: ipv6
 """
 
-RETURN = r"""
-ips:
-  description: 
-    - IPS info.
-  type: list
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    results:
-    - address: "176.124.106.79"
-      attached: false
-      gateway: "176.124.106.1"
-      id: 599
-      prefix: 24
-      server: null
-      slug: "176.124.106.79"
-    - address: "176.124.106.105"
-      attached: false
-      gateway: "176.124.106.1"
-      id: 601
-      prefix: 24
-      server: null
-      slug: "176.124.106.105"
-    - address: "176.124.106.104"
-      attached: true
-      gateway: "176.124.106.1"
-      id: 685
-      prefix: 24
-      server: "hhtest22332.com"
-      slug: "176.124.106.104"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action result information.
-  returned: always
-  type: str
-  sample:
-    - All IPV4 addresses info
-    - All IPV6 addresses info
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
@@ -110,7 +65,7 @@ class IpsInformation(PidginHostCommonModule):
             ips = self.get_ipv4_address_info()
             self.module.exit_json(
                 changed=False,
-                msg=f"All IPV4 addresses info",
+                msg="All IPV4 addresses info",
                 ips=ips.get('results'),
             )
 
@@ -118,7 +73,7 @@ class IpsInformation(PidginHostCommonModule):
             ips = self.get_ipv6_address_info()
             self.module.exit_json(
                 changed=False,
-                msg=f"All IPV6 addresses info",
+                msg="All IPV6 addresses info",
                 ips=ips.get('results'),
             )
 

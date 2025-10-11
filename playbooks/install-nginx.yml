@@ -1,0 +1,82 @@
+---
+# Usage:
+# ansible-playbook -i inventory/pidginhost.yml playbooks/install-nginx.yml \
+#   -e "target_ip=176.124.106.82 target_user=phuser" -vv
+
+# Play 1: create an ephemeral host with the right connection vars
+- name: Define target host for configuration
+  hosts: localhost
+  gather_facts: false
+  vars:
+    target_ip: ""
+    target_user: "phuser"
+  tasks:
+    - name: Validate required inputs
+      ansible.builtin.assert:
+        that: [ "target_ip | length > 0" ]
+        fail_msg: "You must pass -e target_ip=<ip or hostname>"
+
+    - name: Add temp host with correct SSH/sudo/python settings
+      ansible.builtin.add_host:
+        name: temp_target
+        ansible_host: "{{ target_ip }}"
+        ansible_user: "{{ target_user }}"
+        ansible_python_interpreter: /usr/bin/python3
+        # Force sudo noninteractive (matches your working manual call)
+        ansible_become: true
+        ansible_become_method: sudo
+        ansible_become_exe: "sudo -n"
+        # If your sudoers needs a tty, uncomment the next line:
+        # ansible_ssh_common_args: "-tt"
+
+    - name: Wait for SSH on target
+      ansible.builtin.wait_for:
+        host: "{{ target_ip }}"
+        port: 22
+        delay: 2
+        timeout: 600
+
+# Play 2: run tasks directly on the temp host (no delegate_to)
+- name: Install and start Nginx on temp host
+  hosts: temp_target
+  gather_facts: false
+
+  tasks:
+    - name: Sudo sanity check (should be 0)
+      become: false  # run as phuser; we call sudo -n explicitly
+      ansible.builtin.shell: "sudo -n true"
+      register: sudo_check
+      changed_when: false
+      failed_when: sudo_check.rc != 0
+
+    # Option A: use modules + become_exe 'sudo -n'
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        lock_timeout: 600
+
+    - name: Ensure Nginx is enabled and running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    # Optional ufw opening if firewall is active
+    - name: Check ufw status (no fail if missing)
+      become: false
+      changed_when: false
+      failed_when: false
+      ansible.builtin.command: ufw status
+      register: ufw_status
+
+    - name: Allow Nginx through ufw (if active)
+      ansible.builtin.command: ufw allow 'Nginx Full'
+      when:
+        - ufw_status.rc == 0
+        - "'Status: active' in ufw_status.stdout"

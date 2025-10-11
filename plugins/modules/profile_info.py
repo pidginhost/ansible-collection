@@ -11,54 +11,25 @@ DOCUMENTATION = r"""
 ---
 module: profile_info
 
-short_description: Print PidginHost profile info
+short_description: Retrieve PidginHost profile information.
 
 version_added: 0.2.0
 
 description:
-  - Print PidginHost profile info
-  - View the create API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_profile_retrieve).
+  - Retrieve PidginHost profile information.
+  - View the API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_profile_retrieve).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
+
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 """
 
 EXAMPLES = r"""
-- name: Print public interface
+- name: Retrieve PidginHost profile information
   pidginhost.cloud.profile_info:
     state: present
-    
-"""
-
-RETURN = r"""
-account:
-  description: 
-    - Represents the information about storage products.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    account:
-      first_name: Web
-      funds: 999920.41
-      last_name: Test
-      phone: "0000000000"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action result information.
-  returned: always
-  type: str
-  sample:
-    - Current account information
-    - Current account information not found
 """
 
 from ansible.module_utils.basic import AnsibleModule

@@ -1,13 +1,20 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/volumes_products_info.yml -v
-
-- name: Get volumes Products info
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/volumes_products_info.yml
+- name: Retrieve volume products
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    volumes_products_state: present
+
   tasks:
-    - name: Print all volumes Products
+    - name: Query volume products
       pidginhost.cloud.volumes_products_info:
-        state: present
+        state: "{{ volumes_products_state }}"
+      register: volumes_products_result
+
+    - name: Show volume products
+      ansible.builtin.debug:
+        var: volumes_products_result.volumes

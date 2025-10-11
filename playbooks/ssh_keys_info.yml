@@ -1,13 +1,20 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/ssh_keys_info.yml -v
-
-- name: Get SSH keys info
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/ssh_keys_info.yml
+- name: Retrieve SSH keys
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    ssh_keys_state: present
+
   tasks:
-    - name: Print all SSH keys info
+    - name: Query SSH keys
       pidginhost.cloud.ssh_keys_info:
-        state: present
+        state: "{{ ssh_keys_state }}"
+      register: ssh_keys_result
+
+    - name: Show SSH keys
+      ansible.builtin.debug:
+        var: ssh_keys_result.ssh_keys

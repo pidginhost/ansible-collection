@@ -9,125 +9,133 @@ __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: volume
+module: server
 
-short_description: Create or delete Servers
+short_description: Create or delete servers.
 
 version_added: 0.2.0
 
 description:
-  - Creates or deletes Servers.
+  - Create or delete servers.
   - View the create API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_create).
   - View the delete API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_destroy).
-  - Run package_info module to check the available packages.
+  - Run packages_info module to inspect available packages.
 
 author:
   - Popescu Andrei Cristian (@shbpty)
-  
+
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 options:
-  hostname:
+  unique_hostname:
     description:
-      - The human-readable string you wish to use when displaying the Server hostname.
+      - Ensure the hostname is unique when creating or deleting by name.
+    type: bool
+    required: false
+    default: false
+  server_id:
+    description:
+      - Identifier of the server to delete when C(unique_hostname=false).
     type: str
     required: false
   image:
     description:
-      - Specifies the image or template to be used for the server.
+      - Image identifier or slug.
+      - Required when C(state=present).
     type: str
     required: false
   package:
     description:
-      - Specifies the server's package.
+      - Package identifier or slug.
+      - Required when C(state=present).
+    type: str
+    required: false
+  hostname:
+    description:
+      - Hostname to assign to the server.
     type: str
     required: false
   project:
     description:
-      - The project or group the server will be associated with.
+      - Project name to associate with the server.
     type: str
     required: false
   password:
     description:
-      - The password to be used for server authentication.
+      - Password used for server authentication.
     type: str
     required: false
   ssh_pub_key:
     description:
-      - The SSH public key for server access.
+      - SSH public key string used for access.
     type: str
     required: false
   ssh_pub_key_id:
     description:
-      - An identifier for the SSH public key.
+      - Identifier or fingerprint of an existing SSH key in the account.
     type: str
     required: false
   public_ip:
     description:
-      - The public IPv4 address to be assigned to the server.
+      - Existing public IPv4 address to attach to the server.
     type: str
     required: false
   new_ipv4:
     description:
-      - A boolean to indicate whether a new IPv4 address should be assigned.
+      - Request allocation of a new public IPv4 address.
     type: bool
     required: false
   public_ipv6:
     description:
-      - The public IPv6 address to be assigned to the server.
+      - Existing public IPv6 address to attach to the server.
     type: str
     required: false
   new_ipv6:
     description:
-      - A boolean to indicate whether a new IPv6 address should be assigned.
+      - Request allocation of a new public IPv6 address.
     type: bool
     required: false
   fw_rules_set:
     description:
-      - The firewall rules set to be applied to the server.
+      - Firewall rule set slug or identifier to apply.
     type: str
+    required: false
   fw_policy_in:
     description:
-      - The firewall policy for incoming traffic (default is "ACCEPT").
+      - Firewall policy for incoming traffic.
     type: str
-    required: false 
+    required: false
   fw_policy_out:
     description:
-      - The firewall policy for outgoing traffic (default is "ACCEPT").
+      - Firewall policy for outgoing traffic.
     type: str
     required: false
   private_network:
     description:
-      - The private network the server should be connected to.
+      - Private network identifier or slug.
     type: str
     required: false
   private_address:
     description:
-      - The private IPv4 address for the server.
+      - Private IPv4 address to assign when attaching to a private network.
     type: str
     required: false
   extra_volume_product:
     description:
-      - Additional volume type for the server.
+      - Additional volume product slug to provision alongside the server.
     type: str
     required: false
   extra_volume_size:
     description:
-      - Size of the additional volume.
+      - Size in GiB of the additional volume.
     type: str
     required: false
   no_network_acknowledged:
     description:
-      - A boolean confirming network settings.
-    type: bool
-    required: false                               
-  unique_hostname:
-    description:
-      - |
-        When C(true) for C(state=present) the Server will only be created if it has uniq hostname.
-      - |
-        When C(true) for C(state=absent) the Server will only be destroyed if it has uniq hostname.
-    type: bool
+      - Acknowledges creation without a public network when required by the API.
+    type: str
     required: false
-    default: false
 """
 
 EXAMPLES = r"""
@@ -164,72 +172,9 @@ EXAMPLES = r"""
 - name: Delete Server by server id
   pidginhost.cloud.server:
     state: absent
-    server_id: true
+    server_id: "12345"
 """
 
-RETURN = r"""
-server:
-  description: 
-    - Indicates the result of creating the server.
-  type: dict
-  returned: always
-  sample:
-    changed: true
-    failed: false
-    server:
-      cpus: 2
-      disk_size: 64
-      hostname: hhtest22332.com
-      id: 707
-      image: ubuntu22
-      machine:
-        cpu:
-          cores: 2
-          usage: 29.88
-        memory:
-          maxmem: 4294967296
-          mem: 30352674
-          usage: 0.71
-        status: running
-        uptime: 1
-        uptime_text: "0:00:01"
-      memory: 4
-      networks:
-        private: []
-        public:
-          interface: eth0
-          ipv4: 176.124.106.104
-          ipv6: 2001:67c:744:1::22
-      package: cloudv-3
-      project: z5
-      status: provisioning
-      username: phuser
-      volumes: []
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Package you have chosen is PACKAGE value of package must be one of: PACKAGE_LIST
-    - Deleted Cloud Server HOSTNAME (2342) has succeeded.
-    - Cloud server with hostname (HOSTNAME) id (23423) exists
-    - There are currently (234) Servers hostname named (HOSTNAME) : (23,234,234)
-    - Cloud server with hostname (HOSTNAME) would be created.
-    - Cloud server HOSTNAME not found
-    - Cloud server HOSTNAME (2343432) would be deleted
-    - There are currently 2342 Cloud Servers named HOSTNAME : 23,234,234
-    - Must provide server_id when deleting Cloud Server without unique_hostname
-    - Cloud Server with ID 3242 not found
-    - Cloud Server with ID 23423 would be deleted
-"""
 
 import time
 from ansible.module_utils.basic import AnsibleModule
@@ -263,10 +208,12 @@ class PidginHostCloud(PidginHostCommonModule):
         self.no_network_acknowledged = module.params.get("no_network_acknowledged")
         self.timeout = module.params.get("timeout")
 
-        if not self.password and not self.ssh_pub_key:
+        if self.state == "present" and not any([self.password, self.ssh_pub_key, self.ssh_pub_key_id]):
             self.module.fail_json(
                 changed=False,
-                msg=f"At least one of 'password' or 'ssh_pub_key' must be provided.",
+                msg=(
+                    "At least one of 'password', 'ssh_pub_key', or 'ssh_pub_key_id' must be provided."
+                ),
                 server=[],
             )
         # Dynamic max length checker
@@ -358,6 +305,8 @@ class PidginHostCloud(PidginHostCommonModule):
                     server=[],
                 )
 
+            return
+
         if not self.server_id:
             self.module.fail_json(
                 changed=False,
@@ -365,7 +314,7 @@ class PidginHostCloud(PidginHostCommonModule):
                 server=[],
             )
 
-        server = self.get_cloud_server_data_by_id(self.server_id, self.SUCCESS_CODE)
+        server = self.get_cloud_server_data_by_id(self.server_id, self.SUCCESS_CODE, allow_missing=True)
         if not server:
             self.module.exit_json(
                 changed=False,
@@ -376,10 +325,10 @@ class PidginHostCloud(PidginHostCommonModule):
             self.module.exit_json(
                 changed=True,
                 msg=f"Cloud Server with ID {self.server_id} would be deleted",
-                server=server[0],
+                server=server,
             )
         else:
-            self.delete_cloud_server(servers[0])
+            self.delete_cloud_server(server)
 
     def create_cloud_server(self):
         body = {
@@ -407,31 +356,39 @@ class PidginHostCloud(PidginHostCommonModule):
         if server:
             cloud_server = self.check_if_machine_exist(server)
 
-            if cloud_server:
-                machine = cloud_server.get("machine", [])
-                if machine["status"] != "running":
-                    self.module.fail_json(
-                        changed=True,
-                        msg=(
-                            f"Created Cloud {cloud_server['hostname']} "
-                            f"({cloud_server['id']}) is not 'active', it is '{machine['status']}'"
-                        ),
-                        server=server,
-                    )
-                server = self.get_cloud_server_by_id(server['id'])
-                self.module.exit_json(
+            if not cloud_server:
+                self.module.fail_json(
                     changed=True,
                     msg=(
-                        f'You successfully create a new cloud server with hostname'
-                        f' {cloud_server["hostname"]} and id : {cloud_server["id"]}'
+                        f"Timed out waiting for cloud server id {server['id']} to become ready"
                     ),
                     server=server,
                 )
 
+            machine = cloud_server.get("machine", [])
+            if machine["status"] != "running":
+                self.module.fail_json(
+                    changed=True,
+                    msg=(
+                        f"Created Cloud {cloud_server['hostname']} "
+                        f"({cloud_server['id']}) is not 'active', it is '{machine['status']}'"
+                    ),
+                    server=server,
+                )
+            server = self.get_cloud_server_by_id(server['id'])
+            self.module.exit_json(
+                changed=True,
+                msg=(
+                    f"You successfully create a new cloud server with hostname {cloud_server['hostname']} "
+                    f"and id : {cloud_server['id']}"
+                ),
+                server=server,
+            )
+
     def delete_cloud_server(self, server_data):
         server_id = server_data["id"]
         server_hostname = server_data["hostname"]
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}"
+        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}/"
         self.delete_request(url, self.DELETE_SUCCESS_CODE)
 
         server_still_exists = self.get_cloud_server_data_by_id(server_id, self.ERROR_CODES)
@@ -464,31 +421,29 @@ class PidginHostCloud(PidginHostCommonModule):
 
 def main():
     argument_spec = PidginHostOptions.argument_spec()
-    argument_spec.update(ssh_pub_key=dict(type='str', required=False),
-                         unique_hostname=dict(
-                             type=bool,
-                             choices=[True, False],
-                             default=False,
-                         ),
-                         server_id=dict(type='str', required=False),
-                         image=dict(type='str', required=False),
-                         package=dict(type='str', required=False),
-                         hostname=dict(type='str', required=False),
-                         project=dict(type='str', required=False),
-                         password=dict(type='str', required=False, no_log=True),
-                         ssh_pub_key_id=dict(type='str', required=False, no_log=True),
-                         public_ip=dict(type='str', required=False),
-                         new_ipv4=dict(type=bool, required=False),
-                         public_ipv6=dict(type='str', required=False),
-                         new_ipv6=dict(type=bool, required=False),
-                         fw_rules_set=dict(type="str", required=False),
-                         fw_policy_in=dict(type="str", required=False),
-                         fw_policy_out=dict(type="str", required=False),
-                         private_network=dict(type="str", required=False),
-                         private_address=dict(type="str", required=False),
-                         extra_volume_product=dict(type="str", required=False),
-                         extra_volume_size=dict(type="str", required=False),
-                         no_network_acknowledged=dict(type="str", required=False))
+    argument_spec.update(
+        ssh_pub_key=dict(type='str', required=False),
+        unique_hostname=dict(type="bool", default=False, required=False),
+        server_id=dict(type='str', required=False),
+        image=dict(type='str', required=False),
+        package=dict(type='str', required=False),
+        hostname=dict(type='str', required=False),
+        project=dict(type='str', required=False),
+        password=dict(type='str', required=False, no_log=True),
+        ssh_pub_key_id=dict(type='str', required=False, no_log=True),
+        public_ip=dict(type='str', required=False),
+        new_ipv4=dict(type="bool", required=False),
+        public_ipv6=dict(type='str', required=False),
+        new_ipv6=dict(type="bool", required=False),
+        fw_rules_set=dict(type='str', required=False),
+        fw_policy_in=dict(type='str', required=False),
+        fw_policy_out=dict(type='str', required=False),
+        private_network=dict(type='str', required=False),
+        private_address=dict(type='str', required=False),
+        extra_volume_product=dict(type='str', required=False),
+        extra_volume_size=dict(type='str', required=False),
+        no_network_acknowledged=dict(type='str', required=False),
+    )
 
     module = AnsibleModule(
         argument_spec=argument_spec,

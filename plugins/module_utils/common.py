@@ -7,18 +7,21 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-import requests
 import ipaddress
-from ansible.module_utils.basic import env_fallback
 import json
 import logging
+from urllib.error import HTTPError, URLError
+
+from ansible.module_utils.basic import env_fallback
+from ansible.module_utils.common.text.converters import to_text
+from ansible.module_utils.urls import fetch_url, open_url
 
 
 class PidginHostsConstants:
     BASE_URL = 'https://www.pidginhost.com/'
     FIREWALL_RULES_SET_ENDPOINT = "api/cloud/firewall-rules-set/"
     ACCOUNT_PROFILE_ENDPOINT = 'api/account/profile'
-    CLOUD_IMAGE_ENDPOINT = "api/cloud/images"
+    CLOUD_IMAGE_ENDPOINT = "api/cloud/images/"
     CLOUD_PACKAGES_ENDPOINT = "api/cloud/server-packages/"
     CLOUD_SERVERS_ENDPOINT = "api/cloud/servers/"
     SSH_KEYS_ENDPOINT = "api/account/ssh-keys/"
@@ -142,11 +145,56 @@ class PidginHostCommonModule(PidginHostLengthChecker):
         self.state = module.params.get("state")
         self.token = module.params.get("token")
         self.ssh_pub_key = module.params.get("ssh_pub_key")
-        self.payload = {}
+        self.timeout = module.params.get("timeout")
         self.headers = {
             'Authorization': f"Token {self.token}",
             'Accept': 'application/json',
         }
+
+    def _request(self, method, endpoint, body=None, extra_headers=None):
+        url = f"{self.BASE_URL}{endpoint}"
+        headers = self.headers.copy()
+        if extra_headers:
+            headers.update(extra_headers)
+
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode('utf-8')
+            headers.setdefault('Content-Type', 'application/json')
+
+        resp, info = fetch_url(
+            self.module,
+            url,
+            data=data,
+            headers=headers,
+            method=method,
+            timeout=self.timeout,
+        )
+
+        if info.get('exception'):
+            self.module.fail_json(
+                changed=False,
+                msg=f"HTTP {method} request to {url} failed",
+                error=info['exception'],
+            )
+
+        status = info.get('status')
+        if status is None:
+            self.module.fail_json(
+                changed=False,
+                msg=f"PidginHost API error, missing status for request to {url}",
+                response=info,
+            )
+
+        raw = b''
+        if resp:
+            raw = resp.read()
+        elif info.get('body'):
+            raw = info['body']
+            if isinstance(raw, str):
+                raw = raw.encode('utf-8')
+
+        return status, raw
 
     def get_ipv6_address_info(self):
         return self.get_request(self.IPV6_ENDPOINT, self.SUCCESS_CODE)
@@ -176,12 +224,12 @@ class PidginHostCommonModule(PidginHostLengthChecker):
         return self.get_request(self.STORAGE_PRODUCT_ENDPOINT, self.SUCCESS_CODE)
 
     def increase_volume(self, volume_id, body):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}"
+        url = f"{self.VOLUMES_ENDPOINT}{volume_id}/"
 
         return self.patch_request(url, body, self.SUCCESS_CODE)
 
     def delete_volume(self, volume_id):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}"
+        url = f"{self.VOLUMES_ENDPOINT}{volume_id}/"
         return self.delete_request(url, self.DELETE_SUCCESS_CODE)
 
     def add_volume_to_server(self, server_id, body):
@@ -194,7 +242,7 @@ class PidginHostCommonModule(PidginHostLengthChecker):
 
     def attach_volume_by_id(self, volume_id, body):
         url = f"{self.VOLUMES_ENDPOINT}{volume_id}{self.ATTACHE}"
-        self.post_request(url, body, self.SUCCESS_CODE)
+        return self.post_request(url, body, self.SUCCESS_CODE)
 
     def get_server_power_management_by_id(self, server_id, api_code):
         url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.POWER_MANAGEMENT}"
@@ -212,7 +260,7 @@ class PidginHostCommonModule(PidginHostLengthChecker):
         return self.get_request(url, api_code)
 
     def get_volume_by_id(self, volume_id):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}"
+        url = f"{self.VOLUMES_ENDPOINT}{volume_id}/"
         return self.get_request(url, self.SUCCESS_CODE)
 
     def get_all_volumes_from_server_by_id(self, server_id):
@@ -273,9 +321,9 @@ class PidginHostCommonModule(PidginHostLengthChecker):
         return self.get_request(self.CLOUD_SERVERS_ENDPOINT,
                                 api_code)
 
-    def get_cloud_server_data_by_id(self, server_id, api_code):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}"
-        return self.get_request(url, api_code)
+    def get_cloud_server_data_by_id(self, server_id, api_code, allow_missing=False):
+        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}/"
+        return self.get_request(url, api_code, allow_missing=allow_missing)
 
     def get_cloud_server_volumes_by_id(self, server_id, api_code):
         url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.VOLUMES}"
@@ -286,7 +334,7 @@ class PidginHostCommonModule(PidginHostLengthChecker):
         return self.get_request(url, api_code)
 
     def get_cloud_server_by_id(self, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}"
+        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}/"
         return self.get_request(url, self.SUCCESS_CODE)
 
     def get_cloud_server_ipv4(self, api_code):
@@ -294,88 +342,55 @@ class PidginHostCommonModule(PidginHostLengthChecker):
                                 api_code)
 
     def get_request_exist(self, endpoint):
-        url = f"{self.BASE_URL}{endpoint}"
-        response = requests.get(url, headers=self.headers)
-        if self.SUCCESS_CODE == response.status_code:
-            return True
-        else:
-            return None
+        status, unused_content = self._request('GET', endpoint)
+        del unused_content
+        return True if self.SUCCESS_CODE == status else None
 
     def patch_request(self, endpoint, body, api_code):
-        url = f"{self.BASE_URL}{endpoint}"
-        self.headers.update({
-            'Content-Type': 'application/json',
-        })
-        response = requests.patch(url, json=body, headers=self.headers)
-        return self.handle_response(response, endpoint, api_code)
+        status, content = self._request('PATCH', endpoint, body=body)
+        return self.handle_response(status, content, endpoint, api_code)
 
-    def get_request(self, endpoint, api_code):
-        url = f"{self.BASE_URL}{endpoint}"
-        response = requests.get(url, headers=self.headers)
-        return self.handle_response(response, endpoint, api_code)
+    def get_request(self, endpoint, api_code, allow_missing=False):
+        status, content = self._request('GET', endpoint)
+        if allow_missing and status == 404:
+            return None
+        return self.handle_response(status, content, endpoint, api_code)
 
     def post_request(self, endpoint, body, api_code):
-        url = f"{self.BASE_URL}{endpoint}"
-        self.headers.update({
-            'Content-Type': 'application/json',
-        })
-        for key, value in body.items():
-            if value is not None and value != "":
-                self.payload.update({
-                    key: value,
-                })
-        try:
-            response = requests.post(url, json=self.payload, headers=self.headers)
-
-            return self.handle_response(response, endpoint, api_code)
-
-        except requests.RequestException as e:
-            self.module.fail_json(
-                changed=False,
-                msg=f"An error occurred during POST request to {url}",
-                error=e,
-            )
+        payload = {
+            key: value
+            for key, value in body.items()
+            if value is not None and value != ""
+        }
+        status, content = self._request('POST', endpoint, body=payload)
+        return self.handle_response(status, content, endpoint, api_code)
 
     def delete_request(self, endpoint, api_code):
-        url = f"{self.BASE_URL}{endpoint}"
-        self.headers.update({
-            'Content-Type': 'application/json',
-        })
+        status, content = self._request('DELETE', endpoint)
+        if status == api_code and not content:
+            return True
+        return self.handle_response(status, content, endpoint, api_code)
 
-        try:
-            response = requests.delete(url, headers=self.headers)
-            if response.status_code == api_code:
-                return True
-            else:
-                return self.handle_response(response, endpoint, api_code)
-
-        except requests.RequestException as e:
-            self.module.fail_json(
-                changed=False,
-                msg=f"An error occurred during DELETE request to {url}",
-                error=e,
-            )
-
-    def handle_response(self, response, endpoint, api_code):
+    def handle_response(self, status, content, endpoint, api_code):
         url = f"{self.BASE_URL}{endpoint}"
         if api_code == self.ERROR_CODES:
-            for code in self.ERROR_CODES:
-                if code == response.status_code:
-                    return False
-            return True
-        else:
-            if api_code == response.status_code:
-                try:
-                    return response.json()
-                except json.JSONDecodeError:
-                    return response.text
-            else:
-                self.module.fail_json(
-                    changed=False,
-                    msg=f"PidginHost API error, request to {url} failed",
-                    response=response.text,
-                    status_code=response.status_code
-                )
+            return False if status in self.ERROR_CODES else True
+
+        if status == api_code:
+            if not content:
+                return {}
+            text_content = to_text(content, errors='surrogate_or_strict')
+            try:
+                return json.loads(text_content)
+            except json.JSONDecodeError:
+                return text_content
+
+        self.module.fail_json(
+            changed=False,
+            msg=f"PidginHost API error, request to {url} failed",
+            response=to_text(content, errors='surrogate_or_strict'),
+            status_code=status,
+        )
 
     def get_ssh_key_by_id(self, ssh_key_id):
         url = f"{self.SSH_KEYS_ENDPOINT}{ssh_key_id}"
@@ -418,7 +433,7 @@ class PidginHostCommonModule(PidginHostLengthChecker):
                                  body, self.ADD_SUCCESS_CODE)
 
     def delete_ssh_key(self, ssh_key_id):
-        url = f"{self.SSH_KEYS_ENDPOINT}{ssh_key_id}"
+        url = f"{self.SSH_KEYS_ENDPOINT}{ssh_key_id}/"
         return self.delete_request(url, self.DELETE_SUCCESS_CODE)
 
     def validate_ip(self, ip_address):
@@ -471,10 +486,12 @@ class PidginHostCommonInventory:
 
     def get_inventory(self):
         try:
-            response = requests.get(self.url, headers=self.headers)
-            if response.status_code == PidginHostsConstants.SUCCESS_CODE:
-                return response.json().get("results")
-            else:
-                logging.warning(f"{response}")
-        except requests.exceptions.ConnectionError as e:
-            logging.warning(f"Connection Error: {e}")
+            response = open_url(self.url, headers=self.headers, method='GET', timeout=PidginHostsConstants.SLEEP)
+            data = response.read()
+            if data:
+                payload = json.loads(to_text(data, errors='surrogate_or_strict'))
+                return payload.get("results")
+        except (HTTPError, URLError, ValueError) as exc:
+            logging.warning("Connection Error: %s", exc)
+        except Exception as exc:  # pylint: disable=broad-except
+            logging.warning("Unexpected error fetching inventory: %s", exc)

@@ -11,17 +11,26 @@ DOCUMENTATION = r"""
 ---
 module: volumes_info
 
-short_description: List all of storage volumes available on your account
+short_description: List storage volumes available on your account.
 
 version_added: 0.2.0
 
 description:
-  - List all of the storage volumes available on your account.
+  - List storage volumes available on your account or for a specific server.
   - View the API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_volumes_list).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
+options:
+  server_id:
+    description:
+      - Restrict the result to volumes attached to the given server identifier.
+    type: int
+    required: false
 """
 
 EXAMPLES = r"""
@@ -35,62 +44,6 @@ EXAMPLES = r"""
     server_id: 23423
 """
 
-RETURN = r"""
-volumes:
-  description:
-    - Represents the information about volumes.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    msg: "All Volumes info"
-    volumes:
-      - alias: "Volume1"
-        attached: false
-        id: 109
-        product: "fast-storage"
-        project: ""
-        server: ""
-        size: 28
-      - alias: "Volume2"
-        attached: false
-        id: 102
-        product: "fast-storage"
-        project: "zz"
-        server: ""
-        size: 100
-      - alias: "Volume3"
-        attached: false
-        id: 103
-        product: "fast-storage"
-        project: ""
-        server: ""
-        size: 70
-      - alias: "Volume4"
-        attached: false
-        id: 106
-        product: "fast-storage"
-        project: ""
-        server: ""
-        size: 24
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: All Volumes info or Volumes info for server.
-  returned: always
-  type: str
-  sample:
-    - All Volumes info for server id : (122)
-    - All Volumes info.
-    - No Server volumes.
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

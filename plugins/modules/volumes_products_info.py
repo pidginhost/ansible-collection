@@ -18,61 +18,18 @@ version_added: 0.2.0
 description:
   - Print volumes Products info.
   - View the print volumes Products info documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_volumes_list).
+
 author:
   - Popescu Andrei Cristian (@shbpty)
+
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 """
 
 EXAMPLES = r"""
-- name: Print all volumes Products
+- name: Print all volume products
   pidginhost.cloud.volumes_products_info:
     state: present
-  register: result
-"""
-
-RETURN = r"""
-volumes:
-  description: 
-    - Represents the information about storage products.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    volumes:
-      count: 2
-      next: null
-      previous: null
-      results:
-        - id: 10
-          max_size: 100
-          min_size: 10
-          name: "NVMe Storage"
-          price: "0.5000"
-          slug: "ultra-fast-storage"
-          type: "Ultra fast storage"
-          unit: "GB"
-        - id: 11
-          max_size: 1000
-          min_size: 10
-          name: "SSD Storage"
-          price: "0.1000"
-          slug: "fast-storage"
-          type: "Fast storage"
-          unit: "GB"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Volume result information.
-  returned: always
-  type: str
-  sample:
-    - Storage Products info.
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -89,7 +46,7 @@ class StorageProductsInformation(PidginHostCommonModule):
         products = self.get_storage_products_info()
         self.module.exit_json(
             changed=False,
-            msg=f"Storage Products info. ",
+            msg="Storage Products info.",
             volumes=products,
         )
 

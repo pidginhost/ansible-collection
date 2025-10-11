@@ -22,63 +22,14 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 """
-
 
 EXAMPLES = r"""
 - name: List all firewall on your account
   pidginhost.cloud.firewalls_info:
     state: present
-"""
-
-
-RETURN = r"""
-firewalls:
-  description: 
-    - Firewalls data.
-  type: dict
-  returned: always
-  sample:
-    changed: true
-    failed: false
-    firewalls:
-    - id: 58
-      name: "string"
-      read_only: false
-      rules: []
-      status: "validated"
-    - id: 45
-      name: "Free tier FW"
-      read_only: true
-      rules:
-        - action: "ACCEPT"
-          destination: ""
-          direction: "in"
-          dport: "22,80,443"
-          enabled: true
-          error_message: ""
-          has_error: false
-          id: 49
-          position: 0
-          protocol: "tcp"
-          source: ""
-          sport: ""
-      status: "validated"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Current firewalls
-    - No firewalls.
 """
 
 from ansible.module_utils.basic import AnsibleModule

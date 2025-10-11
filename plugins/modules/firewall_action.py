@@ -9,18 +9,20 @@ __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: firewall
+module: firewall_action
 
-short_description: Add public interface to server.
+short_description: Apply a firewall rule set to a server.
 
 version_added: 0.2.0
 
 description:
-  - Add public interface to server.
+  - Attach an existing firewall rule set to a server.
   - View the API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_public_interface_retrieve).
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 options:
   server_hostname:
     description:
@@ -30,18 +32,29 @@ options:
   rules_set_name:
     description:
       - Rules set name.
+      - Required when C(state=present).
     type: str
-    required: true
+    required: false
   policy_in:
     description:
       - Defines the action to be taken for incoming traffic, such as ACCEPT, REJECT, DROP.
+      - Required when C(state=present).
     type: str
-    required: true
+    required: false
+    choices:
+      - ACCEPT
+      - DROP
+      - REJECT
   policy_out:
     description:
-      - Defines the action to be taken for incoming traffic, such as ACCEPT, REJECT, DROP.
+      - Defines the action to be taken for outgoing traffic.
+      - Required when C(state=present).
     type: str
-    required: true
+    required: false
+    choices:
+      - ACCEPT
+      - DROP
+      - REJECT
 """
 
 EXAMPLES = r"""
@@ -54,34 +67,6 @@ EXAMPLES = r"""
     rules_set_name: name
 """
 
-RETURN = r"""
-firewall:
-  description: 
-    - Firewall action.
-  type: dict
-  returned: always
-  sample:
-    
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Firewall rules set RULES_SET_NAME has been applied to server HOSTNAME
-    - No Firewall named (RULES_SET_NAME)
-    - Multiple Firewalls (233) found, with name (RULES_SET_NAME)
-    - No Server named with hostname HOSTNAME
-    - Multiple Servers (3242) found, with hostname: (HOSTNAME)
-    - Firewall rules set RULES_SET_NAME would be applied to server HOSTNAME
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

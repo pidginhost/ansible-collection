@@ -2,65 +2,41 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: volumes_info
+module: public_interface_info
 
-short_description: Get public interface for specific server.
+short_description: Retrieve the public interface for a server.
 
 version_added: 0.2.0
 
 description:
-  - Get public interface for specific server.
+  - Retrieve the public interface for a server by its identifier.
   - View the API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_public_interface_retrieve).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
+options:
+  server_id:
+    description:
+      - Identifier of the server whose public interface should be returned.
+    type: int
+    required: true
 """
 
 EXAMPLES = r"""
-- name: Print public interface
+- name: Retrieve public interface information
   pidginhost.cloud.public_interface_info:
     state: present
     server_id: 624
-"""
-
-RETURN = r"""
-interfaces:
-  description: 
-    - Represents the information about storage products.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    interface:
-      fw_policy_in: ACCEPT
-      fw_policy_out: ACCEPT
-      fw_rules_set: null
-      interface: eth0
-      ipv4: 176.124.106.104
-      ipv6: 2001:67c:744:1::22
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action result information.
-  returned: always
-  type: str
-  sample:
-    - All Volumes info for server id : 234.
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -78,7 +54,7 @@ class PublicInterfaceInformation(PidginHostCommonModule):
         interface = self.get_public_interface_for_server(self.server_id)
         self.module.exit_json(
             changed=False,
-            msg=f"All Volumes info for server id : ({self.server_id})",
+            msg="Public interface information retrieved.",
             interfaces=interface,
         )
 

@@ -1,14 +1,20 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/firewalls_info.yml -v
-
-- name: List all firewall on your account
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/firewalls_info.yml
+- name: Retrieve firewall information
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    firewalls_state: present
+
   tasks:
-    - name: Print all firewalls data
+    - name: Query firewall data
       pidginhost.cloud.firewalls_info:
-        state: present
+        state: "{{ firewalls_state }}"
+      register: firewalls_result
+
+    - name: Show firewalls
+      ansible.builtin.debug:
+        var: firewalls_result.firewalls

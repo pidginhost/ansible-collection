@@ -1,42 +1,144 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/server.yml -v
-
-- name: Create or delete Servers
+# Usage:
+#   # Create a server (debug output includes details)
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/server.yml \
+#     -e "server_state=present \
+#         server_hostname=my-host.example \
+#         server_image=ubuntu22 \
+#         server_package=cloudv-2 \
+#         server_ssh_pub_key='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHc+i7ZBW64xoh3hFg8xoZUsuied9JH77nSWbsP/8Q/X andrei.popescu.c@gmail.com'"
+#
+#   # Delete by hostname (requires unique hostname)
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/server.yml \
+#     -e "server_state=absent \
+#         server_hostname=my-host.example \
+#         server_unique_hostname=true"
+#
+#   # Delete by id
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/server.yml \
+#     -e "server_state=absent server_id=12345"
+- name: Manage PidginHost server lifecycle
   hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    server_state: present            # present|absent
+    server_hostname: "my-host.example"
+    server_id: null                  # used when server_state == "absent"
+    server_unique_hostname: true
+    server_image: "ubuntu22"
+    server_package: "cloudv-2"
+    server_project: null
+    server_password: null
+    server_ssh_pub_key: null
+    server_ssh_pub_key_id: null
+    server_new_ipv4: true
+    server_new_ipv6: true
+    server_public_ip: null
+    server_public_ipv6: null
+    server_fw_rules_set: null
+    server_fw_policy_in: "ACCEPT"
+    server_fw_policy_out: "ACCEPT"
+    server_private_network: null
+    server_private_address: null
+    server_extra_volume_product: null
+    server_extra_volume_size: null
+    server_no_network_acknowledged: false
+
   tasks:
-    - name: Create Server
+    - name: Resolve password input
+      ansible.builtin.set_fact:
+        server_password_resolved: "{{ server_password }}"
+      when:
+        - server_state == 'present'
+        - server_password not in (none, '')
+
+    - name: Resolve password alias input
+      ansible.builtin.set_fact:
+        server_password_resolved: "{{ password }}"
+      when:
+        - server_state == 'present'
+        - server_password_resolved is not defined
+        - password is defined
+        - password not in (none, '')
+
+    - name: Resolve SSH public key input
+      ansible.builtin.set_fact:
+        server_ssh_pub_key_resolved: "{{ server_ssh_pub_key }}"
+      when:
+        - server_state == 'present'
+        - server_ssh_pub_key not in (none, '')
+
+    - name: Resolve SSH public key alias input
+      ansible.builtin.set_fact:
+        server_ssh_pub_key_resolved: "{{ ssh_pub_key }}"
+      when:
+        - server_state == 'present'
+        - server_ssh_pub_key_resolved is not defined
+        - ssh_pub_key is defined
+        - ssh_pub_key not in (none, '')
+
+    - name: Resolve SSH public key id input
+      ansible.builtin.set_fact:
+        server_ssh_pub_key_id_resolved: "{{ server_ssh_pub_key_id }}"
+      when:
+        - server_state == 'present'
+        - server_ssh_pub_key_id not in (none, '')
+
+    - name: Resolve SSH public key id alias input
+      ansible.builtin.set_fact:
+        server_ssh_pub_key_id_resolved: "{{ ssh_pub_key_id }}"
+      when:
+        - server_state == 'present'
+        - server_ssh_pub_key_id_resolved is not defined
+        - ssh_pub_key_id is defined
+        - ssh_pub_key_id not in (none, '')
+
+    - name: Ensure server is present
       pidginhost.cloud.server:
         state: present
-        unique_hostname: true
-        image: string
-        package: string
-        hostname: string
-        project: string
-        password: string
-        ssh_pub_key: string
-        ssh_pub_key_id: string
-        new_ipv4: true
-        new_ipv6: true
-        public_ip: string
-        public_ipv6: string
-        fw_rules_set: string
-        fw_policy_in: ACCEPT
-        fw_policy_out: ACCEPT
-        private_network: string
-        private_address: 198.51.100.42
-        extra_volume_product: string
-        extra_volume_size: 0
-        no_network_acknowledged: true
+        unique_hostname: "{{ server_unique_hostname | bool }}"
+        hostname: "{{ server_hostname }}"
+        image: "{{ server_image }}"
+        package: "{{ server_package }}"
+        project: "{{ server_project if server_project not in (none, '') else omit }}"
+        password: "{{ server_password_resolved | default(omit, true) }}"
+        ssh_pub_key: "{{ server_ssh_pub_key_resolved | default(omit, true) }}"
+        ssh_pub_key_id: "{{ server_ssh_pub_key_id_resolved | default(omit, true) }}"
+        new_ipv4: "{{ server_new_ipv4 | bool }}"
+        new_ipv6: "{{ server_new_ipv6 | bool }}"
+        public_ip: "{{ server_public_ip if server_public_ip not in (none, '') else omit }}"
+        public_ipv6: "{{ server_public_ipv6 if server_public_ipv6 not in (none, '') else omit }}"
+        fw_rules_set: "{{ server_fw_rules_set if server_fw_rules_set not in (none, '') else omit }}"
+        fw_policy_in: "{{ server_fw_policy_in }}"
+        fw_policy_out: "{{ server_fw_policy_out }}"
+        private_network: "{{ server_private_network if server_private_network not in (none, '') else omit }}"
+        private_address: "{{ server_private_address if server_private_address not in (none, '') else omit }}"
+        extra_volume_product: "{{ server_extra_volume_product if server_extra_volume_product not in (none, '') else omit }}"
+        extra_volume_size: "{{ server_extra_volume_size if server_extra_volume_size is not none else omit }}"
+        no_network_acknowledged: "{{ server_no_network_acknowledged | bool }}"
+      when: server_state == 'present'
+      register: server_result
 
-    - name: Delete Server by server hostname
+    - name: Display server details
+      ansible.builtin.debug:
+        var: server_result.server
+      when: server_state == 'present'
+
+    - name: Ensure server is absent by hostname
       pidginhost.cloud.server:
         state: absent
-        unique_hostname: true
-        hostname: string
+        unique_hostname: "{{ server_unique_hostname | bool }}"
+        hostname: "{{ server_hostname }}"
+      when:
+        - server_state == 'absent'
+        - (server_id | default('')) in ['', None]
 
-    - name: Delete Server by server id
+    - name: Ensure server is absent by id
       pidginhost.cloud.server:
         state: absent
-        server_id: true
+        server_id: "{{ server_id }}"
+      when:
+        - server_state == 'absent'
+        - (server_id | default('')) not in ['', None]

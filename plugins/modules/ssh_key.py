@@ -11,126 +11,53 @@ DOCUMENTATION = r"""
 ---
 module: ssh_key
 
-short_description: Manipulate SSH Keys
+short_description: Manage SSH keys.
 
 version_added: 0.2.0
 
 description:
-  - Add all keys from "keys_list".
-  - Delete all keys from "keys_list".
-  - Add specified SSH keys from "keys_list" and delete any other SSH which are not in "keys_list".
-  - View add SSH Key API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_create).
-  - View delete SSH Key documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_destroy).
+  - Add or remove SSH keys for the authenticated account.
+  - View the add SSH key API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_create).
+  - View the delete SSH key API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_destroy).
+
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 options:
+  ssh_pub_key:
+    description:
+      - SSH public key string or a JSON-encoded list of keys when C(delete_others=true).
+    type: str
+    required: true
   delete_others:
     description:
-      - Keep only the keys specified in "keys_list" and delete others.
+      - When true, keep only the provided keys and delete all others.
     type: bool
     required: false
-    choices:
-      - true
-      - false
-  keys_list:
-    description:
-      - A list of keys, must contain at least one key.
-    type: list
-    required: true
+    default: false
 """
 
 EXAMPLES = r"""
-- name: Add SSH keys
+- name: Add a single SSH key
   pidginhost.cloud.ssh_key:
     state: present
-    delete_others: false
-    ssh_pub_key: "{{ item }}"
-  with_items: "{{ keys_list }}"
-  when: not delete_others
+    ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
 
-- name: Delete SSH keys
-  pidginhost.cloud.ssh_key:
-    state: absent
-    delete_others: false
-    ssh_pub_key: "{{ item }}"
-  with_items: "{{ keys_list }}"
-  when: not delete_others
-
-- name: Add specified SSH keys and delete any other SSH keys found based on the delete_others flag
+- name: Replace all SSH keys with a provided list
   pidginhost.cloud.ssh_key:
     state: present
     delete_others: true
-    ssh_pub_key: "{{ keys_list }}"
-  when: delete_others == true and state == 'present'
+    ssh_pub_key: "{{ ['ssh-ed25519 AAA...', 'ssh-ed25519 BBB...'] | to_json }}"
+
+- name: Remove a specific SSH key
+  pidginhost.cloud.ssh_key:
+    state: absent
+    ssh_pub_key: "ssh-ed25519 AAA..."
 """
 
-RETURN = r"""
-ssh_key:
-  description: 
-    - Add SSH keys.
-  changed: true
-  sample:
-    - added_keys: []
-      ansible_loop_var: "item"
-      changed: true
-      deleted_keys: []
-      deleted_msg: []
-      failed: false
-      invocation:
-        module_args:
-          delete_others: false
-          ssh_pub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAgQUhzdiTsW0CwvwOfde/2EOZ40JU5paEHP7ejAO7PB ansible"
-          state: "present"
-          timeout: 300
-          token: "VALUE_SPECIFIED_IN_NO_LOG_PARAMETER"
-      item: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAgQUhzdiTsW0CwvwOfde/2EOZ40JU5paEHP7ejAO7PB ansible"
-      msg: "SSH Pub Key successfully added to cloud"
-      ssh_key: []
-  skipped: false
-  
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - SSH key SSH_KEY fingerprint  (FINGERPRINT) is deleted.
-    - Keys will be added to Cloud.
-    - SSH Pub Key SSH_KEY already exists on cloud
-    - Keys have been added to Cloud.
-    - SSH Pub Key will be added to cloud
-    - SSH Pub Key successfully added to cloud
-    - You need to chose (state present) if you have (delete_others true)
-    - SSH key SSH_KEY does not exist
-    - SSH key SSH_KEY fingerprint  (FINGERPRINT) would be deleted
-deleted_msg:
-  description: Keys deleted information.
-  returned: always
-  type: str
-  sample:
-    - Keys will be deleted from Cloud.
-    - Keys have been deleted from Cloud.
-deleted_keys:
-  description: Deleted Keys.
-  returned: always
-  type: str
-  sample:
-    - Lis of Deleted Keys.
-added_keys:
-  description: Added Keys.
-  returned: always
-  type: str
-  sample:
-    - Lis of Added Keys.
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
@@ -221,7 +148,7 @@ class HandleSSHKeys(PidginHostCommonModule):
                         changed=True,
                         deleted_msg=[],
                         deleted_keys=[],
-                        msg=f"SSH Pub Key will be added to cloud",
+                        msg="SSH Pub Key will be added to cloud",
                         added_keys=[],
                         ssh_key=[],
                     )
@@ -231,7 +158,7 @@ class HandleSSHKeys(PidginHostCommonModule):
                         changed=True,
                         deleted_msg=[],
                         deleted_keys=[],
-                        msg=f"SSH Pub Key successfully added to cloud",
+                        msg="SSH Pub Key successfully added to cloud",
                         added_keys=[],
                         ssh_key=[],
 
@@ -243,7 +170,7 @@ class HandleSSHKeys(PidginHostCommonModule):
                 changed=False,
                 deleted_msg=[],
                 deleted_keys=[],
-                msg=f"You need to chose (state: present) if you have (delete_others: true)",
+                msg="You need to choose state=present when delete_others=true",
                 added_keys=[],
                 ssh_key=[],
             )
@@ -264,8 +191,10 @@ class HandleSSHKeys(PidginHostCommonModule):
                         changed=True,
                         deleted_msg=[],
                         deleted_keys=[],
-                        msg=f"SSH key {self.ssh_pub_key} fingerprint : ({ssh_pub_key_exist['fingerprint']}) "
-                            f"would be deleted",
+                        msg=(
+                            f"SSH key {self.ssh_pub_key} fingerprint : ({ssh_pub_key_exist['fingerprint']}) "
+                            "would be deleted"
+                        ),
                         added_keys=[],
                         ssh_key=ssh_pub_key_exist,
                     )
@@ -275,22 +204,20 @@ class HandleSSHKeys(PidginHostCommonModule):
                         changed=True,
                         deleted_msg=[],
                         deleted_keys=[],
-                        msg=f"SSH key {self.ssh_pub_key} fingerprint : ({ssh_pub_key_exist['fingerprint']}) "
-                            f"is deleted",
+                        msg=(
+                            f"SSH key {self.ssh_pub_key} fingerprint : ({ssh_pub_key_exist['fingerprint']}) "
+                            "is deleted"
+                        ),
                         added_keys=[],
                         ssh_key=ssh_pub_key_exist)
 
 
 def main():
     argument_spec = PidginHostOptions.argument_spec()
-    argument_spec.update(ssh_pub_key=dict(type='str', required=True),
-                         delete_others=dict(
-                             type=bool,
-                             choices=[True, False],
-                             default=False,
-                             required=False
-                         )
-                         )
+    argument_spec.update(
+        ssh_pub_key=dict(type='str', required=True),
+        delete_others=dict(type='bool', default=False, required=False),
+    )
 
     module = AnsibleModule(
         argument_spec=argument_spec,

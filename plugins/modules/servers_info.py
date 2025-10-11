@@ -22,6 +22,9 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 """
 
 EXAMPLES = r"""
@@ -30,46 +33,6 @@ EXAMPLES = r"""
     state: present
 """
 
-RETURN = r"""
-servers:
-  description: 
-    - List all Servers info.
-  changed: false
-  failed: false
-  msg: "All Servers info."
-  sample:
-    cpus: 2
-    disk_size: 64
-    hostname: "hhtest22332.com"
-    id: 707
-    image: "ubuntu22"
-    memory: 4
-    networks:
-      private: []
-      public:
-        interface: "eth0"
-        ipv4: "176.124.106.104"
-        ipv6: ""
-    package: "cloudv-3"
-    project: "z5"
-    status: "active"
-
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to URL failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - All Servers info.
-    - No Server info.
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
@@ -85,7 +48,7 @@ class ServersInfo(PidginHostCommonModule):
         server_data = self.get_cloud_servers_data(self.SUCCESS_CODE)
         self.module.exit_json(
             changed=False,
-            msg=f"All Servers info.",
+            msg="All Servers info.",
             servers=server_data.get("results")[0],
         )
         self.module.exit_json(changed=False, msg="No Server info.", servers=[])

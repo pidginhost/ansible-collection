@@ -26,6 +26,8 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 options:
   volume_alias:
     description:
@@ -53,45 +55,6 @@ EXAMPLES = r"""
     server_hostname: hostname.com
 """
 
-RETURN = r"""
-action:
-  description: 
-    - Attach or detach volume from Server.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    action:
-      alias: "Volume4444"
-      attached: true
-      id: 128
-      product: "fast-storage"
-      project: "z5"
-      server: "hhtest22332.com"
-      size: 50
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Volume action information.
-  returned: always
-  type: str
-  sample:
-    - No detached volume with alias ALIAS
-    - Multiple detached volumes 10 with alias ALIAS
-    - Multiple attached volumes 10 with alias ALIAS
-    - Multiple Servers 10 found, with hostname: HOSTNAME
-    - Volume alias  (ALIAS) id  (191) would be attached to (HOSTNAME) 
-    - Attached volume (ALIAS) to (HOSTNAME)
-    - Volume alias  (ALIAS) id  (191) would be detached from (HOSTNAME)
-    - No attached volume with alias: ALIAS
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
@@ -227,7 +190,7 @@ def main():
     argument_spec = PidginHostOptions.argument_spec()
     argument_spec.update(
         volume_alias=dict(type="str", required=True),
-        server_hostname=dict(type="str", required=False),
+        server_hostname=dict(type="str", required=True),
 
     )
     module = AnsibleModule(

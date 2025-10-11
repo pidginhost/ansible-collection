@@ -11,54 +11,49 @@ DOCUMENTATION = r"""
 ---
 module: volume
 
-short_description: Add or Delete Volume
+short_description: Create or delete volumes.
 
 version_added: 0.2.0
 
 description:
-  - Creates or deletes volumes.
+  - Create or delete storage volumes.
   - View the create API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/v1/v1_cloud_servers_volumes_create).
   - View the delete API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/v1/v1_cloud_servers_destroy).
-  - To check storage available products use volumes_products_info
+  - Use volumes_products_info to discover available products.
 
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 options:
   volume_alias:
     description:
-      - The alias name of the Volume.
+      - Alias to assign to the volume.
     type: str
     required: true
-    when: state == "absent"
-
   size_gigabytes:
     description:
-      - The size of the storage volume in GiB.
+      - Size of the volume in GiB.
+      - Required when C(state=present).
     type: int
-    required: true
-    when: state == "present"
-
+    required: false
   product:
     description:
-      - The type of volume being created.
+      - Volume product slug.
+      - Required when C(state=present).
     type: str
-    required: true
-    when: state == "present"
-    choices:
-      - fast-storage
-      - ultra-fast-storage
-
+    required: false
   hostname:
     description:
-      - The hostname of the Server.
+      - Hostname of the server the volume will attach to.
+      - Required when C(state=present).
     type: str
-    required: true
-    when: state == "present"
-
+    required: false
   project:
     description:
-      - The project name.
+      - Project name associated with the volume.
     type: str
     required: false
 """
@@ -79,47 +74,6 @@ EXAMPLES = r"""
     volume_alias: alias
 """
 
-RETURN = r"""
-volume:
-  description:
-    - Represents action on volume.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    volume:
-      alias: "Volume4444"
-      attached: true
-      id: 127
-      product: "fast-storage"
-      project: "z5"
-      server: "hhtest22332.com"
-      size: 50
-
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Deleted volume (VOLUME_ALIAS).
-    - No Product named PRODUCT, available products LIST_OF_ALL_PRODUCTS.
-    - No Server named with hostname HOSTNAME.
-    - Multiple Servers (11) found, with hostname (HOSTNAME)
-    - No detached volume with alias VOLUME_ALIAS
-    - Multiple detached volumes (11) with alias (VOLUME_ALIAS)
-    - Volume will be added to (HOSTNAME) with id  (11)
-    - Add volume to (VOLUME_ALIAS) attached to server (HOSTNAME) with id  (1212)
-    - Volume (VOLUME_ALIAS) would be deleted
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
@@ -227,7 +181,7 @@ def main():
                          size_gigabytes=dict(type="int", required=False),
                          product=dict(type="str", required=False),
                          hostname=dict(type="str", required=False),
-                         volume_alias=dict(type="str", required=False)
+                         volume_alias=dict(type="str", required=True)
                          )
     module = AnsibleModule(
         argument_spec=argument_spec,

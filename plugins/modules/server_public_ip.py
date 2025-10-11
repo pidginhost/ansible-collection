@@ -2,70 +2,42 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: pidginhost.cloud.server_public_ip
+module: server_public_ip
 
-short_description: Get specific server ip.
+short_description: Retrieve the public IPv4 address for a server.
 
 version_added: 0.2.0
 
 description:
-  - Get specific server id.
+  - Retrieve the public IPv4 address for a server identified by hostname.
   - View the API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_retrieve).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 options:
   server_hostname:
     description:
-      - The hostname of the Server to act on.
-      - If provided, must be unique.
+      - Hostname of the server.
+      - Must resolve to a unique server.
     type: str
     required: true
 """
 
 EXAMPLES = r"""
-- name: Get specific server ip
+- name: Retrieve server public IPv4 address
   pidginhost.cloud.server_public_ip:
     state: present
     server_hostname: hostname
-"""
-
-RETURN = r"""
-server:
-  description:
-    - Get specific server ip.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    server: 176.124.106.79
-
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - No Server named with hostname HOSTNAME
-    - Multiple Servers (11) found, with hostname (HOSTNAME)
-    - Find Server id: 232 with ip address IP_ADDRESS
 """
 
 import time

@@ -1,13 +1,20 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/profile_info.yml -v
-
-- name: Get PidginHost profile info
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/profile_info.yml
+- name: Retrieve account profile details
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    profile_state: present
+
   tasks:
-    - name: Print all profile data
+    - name: Query account profile
       pidginhost.cloud.profile_info:
-        state: present
+        state: "{{ profile_state }}"
+      register: profile_result
+
+    - name: Show account profile
+      ansible.builtin.debug:
+        var: profile_result.account

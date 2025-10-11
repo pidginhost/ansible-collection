@@ -25,12 +25,18 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 options:
   create_rules_set:
     description:
       - If you want to create a rules set.
     type: bool
     required: false
+    default: false
+    choices:
+      - true
+      - false
   rules_set_name:
     description:
       - A human-readable name for a firewall rules set.
@@ -42,11 +48,18 @@ options:
       - Specifies that the rule is for incoming traffic (IN, OUT.)
     type: str
     required: false
+    choices:
+      - in
+      - out
   action:
     description:
       - Defines the action to be taken for incoming traffic, such as ACCEPT, REJECT, DROP.
     type: str
     required: false
+    choices:
+      - ACCEPT
+      - DROP
+      - REJECT
   protocol:
     description:
       - Specifies the network protocol (e.g., TCP, UDP) that the rule applies to.
@@ -110,54 +123,6 @@ EXAMPLES = r"""
     dport: 22
     enabled: true
     position: 0
-"""
-
-RETURN = r"""
-firewall:
-  description:
-    - Create firewall rules set
-  type: dict
-  returned: always
-  sample:
-    module_args:
-      action: null
-      create_rules_set: true
-      destination: null
-      direction: null
-      dport: null
-      enabled: null
-      position: null
-      protocol: null
-      rules_set_name: Firewall rules set name22222
-      source: null
-      sport: null
-      state: present
-      timeout: 300
-      token: VALUE_SPECIFIED_IN_NO_LOG_PARAMETER
-
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Firewall rules set RULES_SET_NAME (34543) has been be deleted
-    - For 'state'='state', both 'direction' and 'action' are required when 'create_rules_set' is RULES_SET_NAME.
-    - No Firewall named  (RULES_SET_NAME)
-    - Multiple Firewalls (345) found, with name (RULES_SET_NAME)
-    - Firewall rules set RULES_SET_NAME would be created
-    - Firewall rules set RULES_SET_NAME has been created
-    - New rules will be added for RULES_SET_NAME
-    - Firewall rules has been added for RULES_SET_NAME
-    - Firewall rules set RULES_SET_NAME (24234) would be deleted
-    - Firewall rules set RULES_SET_NAME (23432) has been be deleted
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -287,7 +252,7 @@ def main():
     argument_spec = PidginHostOptions.argument_spec()
     argument_spec.update(
         create_rules_set=dict(
-            type=bool,
+            type="bool",
             choices=[True, False],
             default=False),
         rules_set_name=dict(type="str", required=True),
@@ -298,7 +263,7 @@ def main():
         sport=dict(type="str", required=False),
         destination=dict(type="str", required=False),
         dport=dict(type="str", required=False),
-        enabled=dict(type=bool, required=False),
+        enabled=dict(type="bool", required=False),
         position=dict(type="str", required=False),
 
     )

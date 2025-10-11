@@ -1,13 +1,20 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/servers_info.yml -v
-
-- name: Print all Servers info
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/servers_info.yml
+- name: Retrieve servers summary
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    servers_state: present
+
   tasks:
-    - name: Print all Servers info
+    - name: Query servers
       pidginhost.cloud.servers_info:
-        state: present
+        state: "{{ servers_state }}"
+      register: servers_result
+
+    - name: Show servers
+      ansible.builtin.debug:
+        var: servers_result.servers

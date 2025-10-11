@@ -21,6 +21,9 @@ description:
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 """
 
 EXAMPLES = r"""
@@ -30,32 +33,6 @@ EXAMPLES = r"""
   register: result
 """
 
-RETURN = r"""
-ssh_keys:
-  description: 
-    - Print SSH Keys info.
-  changed: false
-  failed: false
-  ssh_keys:
-    - alias: "and.c"
-      fingerprint: "ryBS/UY64JDh5k0/6c0gjHyswHaY5Mngq+qBNF1wYdg"
-      id: 118
-      key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCo3WBKsJb8xE"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Current SSH keys.
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions

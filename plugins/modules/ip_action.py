@@ -11,117 +11,67 @@ DOCUMENTATION = r"""
 ---
 module: ip_action
 
-short_description: Attach, detach IP from Server
+short_description: Attach or detach an IP address from a server.
 
 version_added: 0.2.0
 
 description:
-  - Attach, detach IP from Server.
-  - Attach, detach IP from Server.
-  - First, the IP needs to be detached and then attached.
+  - Attach or detach an IP address from a server.
   - Each server may only have one IPv4 address attached, as well as one IPv6 address.
-  - View the attach IPV4 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_attach_ipv4_create).
-  - View the attach IPV6 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_attach_ipv6_create).
-  - View the detach IPV4 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_detach_ipv4_create).
-  - View the detach IPV6 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_detach_ipv6_create).
+  - View the attach IPv4 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_attach_ipv4_create).
+  - View the attach IPv6 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_attach_ipv6_create).
+  - View the detach IPv4 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_detach_ipv4_create).
+  - View the detach IPv6 API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_detach_ipv6_create).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 options:
   server_id:
     description:
-      - A unique identifier for a Server instance.
-      - If provided, 'server_hostname' is ignored.
+      - Identifier of the server to target. Ignored when C(server_hostname) is provided.
     type: int
     required: false
 
   server_hostname:
     description:
-      - The hostname of the Server to act on.
-      - If provided, must be unique.
+      - Hostname of the server to target. Must be unique when used.
     type: str
     required: false
 
   ip_address:
     description:
-      - The IP you want to detach or attach.
+      - IP address to attach or detach.
+    type: str
+    required: true
+
+  server_ip:
+    description:
+      - Server IP identifier returned by the API. Required when attaching an IP.
     type: str
     required: false
 """
 
 EXAMPLES = r"""
-- name: Attach ip to Server by hostname
+- name: Attach IP to server by hostname
   pidginhost.cloud.ip_action:
-    server_hostname: hostname
-    server_ip: 23432
     state: present
+    server_hostname: hostname
+    ip_address: 192.0.2.10
 
-- name: Attach ip to Server by id
+- name: Attach IP to server by id
   pidginhost.cloud.ip_action:
-    server_hostname: hostname
-    server_ip: 23432
     state: present
-    ip_address: 4234223
+    server_id: 42
+    ip_address: 198.51.100.5
 
-- name: Detach ip from Server
+- name: Detach IP from server
   pidginhost.cloud.ip_action:
     state: absent
-    ip_address: 4234223
-"""
-RETURN = r"""
-ips:
-  description: 
-    - IPS info.
-  type: list
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    results:
-    - address: "176.124.106.79"
-      attached: false
-      gateway: "176.124.106.1"
-      id: 599
-      prefix: 24
-      server: null
-      slug: "176.124.106.79"
-    - address: "176.124.106.105"
-      attached: false
-      gateway: "176.124.106.1"
-      id: 601
-      prefix: 24
-      server: null
-      slug: "176.124.106.105"
-    - address: "176.124.106.104"
-      attached: true
-      gateway: "176.124.106.1"
-      id: 685
-      prefix: 24
-      server: "hhtest22332.com"
-      slug: "176.124.106.104"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action result information.
-  returned: always
-  type: str
-  sample:
-    - Server already have attached an (IP_TYPE)
-    - No Server with ID (SERVER_ID)
-    - No Server named with hostname HOSTNAME
-    - Multiple Servers (2332) found, with hostname: (HOSTNAME)
-    - IP (IP) will be attached to server (HOSTNAME).
-    - IP (IP) attached.
-    - IP (IP) attached to (HOSTNAME)
-    - IP (IP) will be detached from server (HOSTNAME)
-    - IP (IP) detached from server (HOSTNAME)
+    ip_address: 198.51.100.5
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -288,18 +238,16 @@ class IpsAction(PidginHostCommonModule):
 def main():
     argument_spec = PidginHostOptions.argument_spec()
     argument_spec.update(
-        server_id=dict(type="int", required_one_of=["hostname", "server_id"]),
+        server_id=dict(type="int", required=False),
         ip_address=dict(type="str", required=True),
-        server_hostname=dict(type="str", required_one_of=["hostname", "server_id"]),
+        server_hostname=dict(type="str", required=False),
         server_ip=dict(type="str", required=False),
 
     )
     module = AnsibleModule(
         argument_spec=argument_spec,
         supports_check_mode=True,
-        required_if=[
-            ("state", "present", ["server_ip"]),
-        ],
+        required_one_of=[("server_id", "server_hostname")],
     )
     IpsAction(module)
 

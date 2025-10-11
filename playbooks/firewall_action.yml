@@ -1,18 +1,33 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/firewall_action.yml -v
-
-- name: Add public interface to server.
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/firewall_action.yml \
+#    -e firewall_action_state=present \
+#    -e firewall_rules_set_name=my-nginx-rules \
+#    -e firewall_server_hostname=my-host.example \
+#    -e firewall_policy_in=ACCEPT \
+#    -e firewall_policy_out=ACCEPT
+- name: Manage firewall policy on a server
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    firewall_action_state: present          # present|absent
+    firewall_rules_set_name: "default"
+    firewall_server_hostname: "my-host.example"
+    firewall_policy_in: "ACCEPT"
+    firewall_policy_out: "ACCEPT"
+
   tasks:
-    - name: Add public interface
+    - name: Apply firewall policy
       pidginhost.cloud.firewall_action:
-        state: present
-        policy_in: ACCEPT
-        policy_out: ACCEPT
-        server_hostname: hhtest5.com
-        rules_set_name: Firewall rules set name
+        state: "{{ firewall_action_state }}"
+        policy_in: "{{ firewall_policy_in }}"
+        policy_out: "{{ firewall_policy_out }}"
+        server_hostname: "{{ firewall_server_hostname }}"
+        rules_set_name: "{{ firewall_rules_set_name }}"
+      register: firewall_action_result
+
+    - name: Show firewall action result
+      ansible.builtin.debug:
+        var: firewall_action_result

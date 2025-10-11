@@ -25,6 +25,8 @@ author:
   - Popescu Andrei Cristian (@shbpty)
 
 
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
 options:
   server_id:
     description:
@@ -52,6 +54,16 @@ options:
   package_name:
     description:
       - The package slug name of the new package must be higher than the current one.
+    type: str
+    required: false
+  product:
+    description:
+      - Volume product slug to use when resizing a volume.
+    type: str
+    required: false
+  project:
+    description:
+      - Project associated with the volume resize operation.
     type: str
     required: false
   volume_alias:
@@ -95,83 +107,6 @@ EXAMPLES = r"""
     package_name: cloudv-3
 """
 
-RETURN = r"""
-action:
-  description: 
-    - Resize a Server Volume or upgrade Server package
-  type: dict
-  returned: always
-  changed: true
-  failed: false
-  sample:
-    cpus: 8
-    disk_size: 200
-    hostname: hhtest22332.com
-    id: 707
-    image: ubuntu22
-    machine:
-      cpu:
-        cores: 8
-        usage: 9.06
-      memory:
-        maxmem: 34359738368
-        mem: 121700352
-        usage: 0.35
-      status: running
-      uptime: 7
-      uptime_text: 0:00:07
-    memory: 32
-    networks:
-      private: []
-      public:
-        interface: eth0
-        ipv4: 176.124.106.104
-        ipv6: 2001:67c:744:1::22
-    package: cloudv-6
-    project: z5
-    status: active
-    username: phuser
-    volumes:
-      - alias: Volume
-        attached: true
-        id: 123
-        product: fast-storage
-        project: z5
-        server: hhtest22332.com
-        size: 17
-      - alias: Volume4444
-        attached: true
-        id: 129
-        product: fast-storage
-        project: z5
-        server: hhtest22332.com
-        size: 50
-
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action information.
-  returned: always
-  type: str
-  sample:
-    - Package you have chosen is PACKAGE value of package must be one of: PACKAGE_LIST
-    - Server HOSTNAME have new package PACKAGE
-    - No Server with ID 23423
-    - No Server named with hostname HOSTNAME
-    - Multiple Servers (23423) found, with hostname: (HOSTNAME)
-    - No attached volume with alias: (VOLUME_ALIAS)
-    - Multiple attached volumes (23423) with alias: (VOLUME_ALIAS)
-    - The volume size is (23) while you selected (11) , resulting in the inability to reduce the volume size.
-    - Volume (VOLUME_ALIAS) from Server HOSTNAME (23442) would be sent action 'resize',
-      requested size is '55' and current size is 44
-    - Volume (VOLUME_ALIAS) from Server HOSTNAME (2323) current size is '55' and last size was 44
-"""
 
 import time
 from ansible.module_utils.basic import AnsibleModule
@@ -274,7 +209,7 @@ class ServerActionResize(PidginHostCommonModule):
                     msg=(
                         f"The volume size is ({volume['size']}) , "
                         f"while you selected ({self.size_gigabytes}) , "
-                        f"resulting in the inability to reduce the volume size."),
+                        "resulting in the inability to reduce the volume size."),
                     action=[],
                 )
             if self.module.check_mode:

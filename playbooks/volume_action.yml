@@ -1,21 +1,36 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/volume_action.yml -v
-
-- name: Attach or Detach volume from Server
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/volume_action.yml \
+#     -e "volume_action_state=present \
+#         volume_alias=data-volume \
+#         volume_server_hostname=my-host.example"
+- name: Manage volume attachment
   hosts: localhost
   connection: local
   gather_facts: false
-  tasks:
-    - name: Attach volume to Server
-      pidginhost.cloud.volume_action:
-        state: present
-        volume_alias: alias
-        server_hostname: hostname.com
 
-    - name: Detach volume from Server
+  vars:
+    volume_action_state: present          # present|absent
+    volume_alias: null
+    volume_server_hostname: null
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - volume_alias is not none
+          - volume_alias | length > 0
+          - volume_server_hostname is not none
+          - volume_server_hostname | length > 0
+        fail_msg: "Set volume_alias and volume_server_hostname to manage the attachment."
+
+    - name: Apply volume action
       pidginhost.cloud.volume_action:
-        state: absent
-        volume_alias: alias
-        server_hostname: hostname.com
+        state: "{{ volume_action_state }}"
+        volume_alias: "{{ volume_alias }}"
+        server_hostname: "{{ volume_server_hostname }}"
+      register: volume_action_result
+
+    - name: Show volume action result
+      ansible.builtin.debug:
+        var: volume_action_result.action

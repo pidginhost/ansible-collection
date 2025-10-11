@@ -1,15 +1,30 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/public_interface_info.yml -v
-
-- name: Print public interface
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/public_interface_info.yml \
+#     -e "public_interface_server_id=12345"
+- name: Retrieve server public interface
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    public_interface_state: present
+    public_interface_server_id: null
+
   tasks:
-    - name: Print volumes info for specific Server id
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - public_interface_server_id is not none
+          - public_interface_server_id | int > 0
+        fail_msg: "Set public_interface_server_id to a valid server identifier."
+
+    - name: Query public interface
       pidginhost.cloud.public_interface_info:
-        state: present
-        server_id: 707
-      register: result
+        state: "{{ public_interface_state }}"
+        server_id: "{{ public_interface_server_id | int }}"
+      register: public_interface_result
+
+    - name: Show public interface
+      ansible.builtin.debug:
+        var: public_interface_result.interfaces

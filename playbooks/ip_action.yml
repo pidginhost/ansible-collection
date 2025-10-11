@@ -1,28 +1,61 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/ip_action.yml -v
-
-- name: Attach or Detach volume from Server
+# Usage:
+#   # Attach a floating IP
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/ip_action.yml \
+#     -e "ip_action_state=present \
+#         ip_address=198.51.100.10 \
+#         ip_server_hostname=my-host.example"
+#   # Detache a floating IP
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/ip_action.yml \
+#     -e "ip_action_state=absent \
+#         ip_address=198.51.100.10 \
+#         ip_server_hostname=my-host.example"
+- name: Manage floating IP attachment
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    ip_action_state: present          # present|absent
+    ip_address: null
+    ip_server_hostname: null
+    ip_server_id: null
+    ip_server_ip: null                # API identifier returned when attaching
+
   tasks:
-    - name: Attach ip to Server by hostname
-      pidginhost.cloud.ip_action:
-        server_hostname: hostname
-        server_ip: 23432
-        state: present
+    - name: Validate IP address input
+      ansible.builtin.assert:
+        that:
+          - ip_address is not none
+          - ip_address | length > 0
+        fail_msg: "Set ip_address to the IPv4/IPv6 address you want to manage."
 
-    - name: Attach ip to Server by id
-      pidginhost.cloud.ip_action:
-        server_hostname: hostname
-        server_ip: 23432
-        state: present
-        ip_address: 4234223
+    - name: Build IP action arguments
+      ansible.builtin.set_fact:
+        ip_action_args: "{{ {
+          'state': ip_action_state,
+          'ip_address': ip_address
+        } }}"
 
-    - name: Detach ip from Server
-      pidginhost.cloud.ip_action:
-        state: absent
-        ip_address: 4234223
+    - name: Include server hostname target
+      ansible.builtin.set_fact:
+        ip_action_args: "{{ ip_action_args | combine({'server_hostname': ip_server_hostname}) }}"
+      when: ip_server_hostname not in (none, '')
+
+    - name: Include server id target
+      ansible.builtin.set_fact:
+        ip_action_args: "{{ ip_action_args | combine({'server_id': ip_server_id}) }}"
+      when: ip_server_id not in (none, '')
+
+    - name: Include server IP identifier
+      ansible.builtin.set_fact:
+        ip_action_args: "{{ ip_action_args | combine({'server_ip': ip_server_ip}) }}"
+      when: ip_server_ip not in (none, '')
+
+    - name: Apply IP action
+      pidginhost.cloud.ip_action: "{{ ip_action_args }}"
+      register: ip_action_result
+
+    - name: Show IP action result
+      ansible.builtin.debug:
+        var: ip_action_result

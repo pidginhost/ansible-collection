@@ -1,340 +1,79 @@
-# PidginHost Collection
+# PidginHost Cloud Ansible Collection
 
-<div class="image-container">
-  <p align="center">
-    <img src="ph+an.png"
-         alt="PidginHost + Ansible"
-         title="PidginHost + Ansible">
-  </p>
+![PidginHost + Ansible](ph+an.png)
 
-</div>
+This repository contains the `pidginhost.cloud` Ansible collection used to provision and manage resources in the [PidginHost](https://www.pidginhost.com/) cloud. It ships production modules, a dynamic inventory plugin, and playbook templates that wrap the public API so you can automate server, volume, networking, and firewall workflows end to end.
 
+## Requirements
+- Python 3.9+ with Ansible 2.14 or newer (`meta/runtime.yml` specifies `>=2.14.0`).
+- A valid PidginHost API token exported as `PIDGINHOST_TOKEN` or `PIDGINHOST_ACCESS_TOKEN`.
+- Ability to reach `https://www.pidginhost.com/` from the control host; no additional Python dependencies are required.
 
-This repository contains the [`pidginhost.cloud`](https://galaxy.ansible.com/ui/repo/published/pidginhost/cloud/)
-Ansible Collection.
+## Repository Layout
+| Path | Purpose |
+| --- | --- |
+| `plugins/modules/` | Collection modules for servers, firewalls, networks, volumes, IPs, and account data. |
+| `plugins/module_utils/common.py` | Shared HTTP client, argument validation, and API helpers. |
+| `plugins/inventory/servers.py` | Dynamic inventory plugin that maps PidginHost servers into Ansible hosts. |
+| `playbooks/` | Ready-to-run examples such as `server.yml`, `profile_info.yml`, and `install-nginx.yml`. |
+| `inventory/pidginhost.yml` | Inventory source configured for the dynamic plugin with JSON cache support. |
+| `ansible.cfg` | Enables YAML callbacks for readable output. |
+| `AGENTS.md` | Contributor workflow, coding style, and security expectations. |
 
-## PidginHost Collection for Ansible
-
-[![Ansible Collection](https://img.shields.io/badge/Ansible%20Collection-%20pidginhost.cloud-blue)]([https://galaxy.ansible.com/pidginhost/cloud])
-
-This collection can be used to manage infrastructure in the [PidginHost](https://www.pidginhost.com/) cloud.
-The PidginHost API documentation is located [here](https://www.pidginhost.com/api/schema/swagger-ui/).
-
-## Code of Conduct
-
-I follow the [Ansible Code of Conduct](https://docs.ansible.com/ansible/devel/community/code_of_conduct.html) in all my
-interactions within this project.
-
-If you encounter abusive behavior, please refer to
-the [policy violations](https://docs.ansible.com/ansible/devel/community/code_of_conduct.html#policy-violations) section
-of the Code for information on how to raise a complaint.
-
-## External requirements
-
-```text
-requests
-```
-
-## Included content
-
-| Module                                   | Description                                       |
-|------------------------------------------|---------------------------------------------------|
-| `pidginhost.cloud.firewall`              | Create firewalls rules set/add rules to rules set |
-| `pidginhost.cloud.firewall_action`       | Add firewall                                      |
-| `pidginhost.cloud.firewalls_info`        | Get firewalls                                     |
-| `pidginhost.cloud.images_info`           | Get images                                        |
-| `pidginhost.cloud.ip_action`             | Attach/detach IP from Server                      |
-| `pidginhost.cloud.ips_info`              | Get ips info                                      |
-| `pidginhost.cloud.packages_info`         | Get packages                                      |
-| `pidginhost.cloud.profile_info`          | Get profile                                       |
-| `pidginhost.cloud.public_interface_info` | Get public interface for specific server          |
-| `pidginhost.cloud.server`                | Create or delete Servers                          |
-| `pidginhost.cloud.server_action_power`   | Manage Servers action power                       |
-| `pidginhost.cloud.server_action_resize`  | Resize a Server Volume or upgrade Server package  |
-| `pidginhost.cloud.server_public_ip`      | Get specific server ip                            |
-| `pidginhost.cloud.servers_info`          | Get all Servers info                              |
-| `pidginhost.cloud.ssh_key`               | Manage SSH Keys                                   |
-| `pidginhost.cloud.ssh_keys_info`         | Get SSH Keys info                                 |
-| `pidginhost.cloud.volume`                | Add or Delete Volume                              |
-| `pidginhost.cloud.volume_action`         | Attach or detach volume from Server               |
-| `pidginhost.cloud.volumes_info`          | Get storage volumes                               |
-| `pidginhost.cloud.volumes_products_info` | Get volumes Products                              |
-
-| Inventory Plugin           | Description                      |
-|----------------------------|----------------------------------|
-| `pidginhost.cloud.servers` | Servers dynamic inventory plugin |
-
-
-## Using this collection
-
-There are sample playbooks in the [playbooks](playbooks) directory.
-
-Be sure to set the `$PIDGINHOST_TOKEN` environment variable as all modules require authentication.
-This is preferable in contrast to using the `token` module parameter in the play and storing your API token in plaintext
-within your playbook.
-
-> **Warning**
-> Keep in mind, running the sample playbooks that create cloud resources will cost real money.
-
-[This](playbooks/profile_info.yml) is a sample playbook which returns your PidginHost account information:
-
-```yaml
----
-- name: Get PidginHost profile info
-  hosts: localhost
-  connection: local
-  gather_facts: false
-  tasks:
-    - name: Print all profile data
-      pidginhost.cloud.profile_info:
-        state: present
-```
-
-Output should look similar to the following:
-
-```shell
-❯ ansible-playbook -i localhost playbooks/profile_info.yml -v
-
-PLAY [Get PidginHost profile info] ****************************************************************************************************************************************************************************
-
-TASK [Print all profile data] *********************************************************************************************************************************************************************************
-ok: [localhost] => changed=false 
-  account:
-    first_name: Web
-    funds: '999856.80'
-    last_name: Test
-    phone: '0000000000'
-  msg: Current account information
-
-PLAY RECAP ****************************************************************************************************************************************************************************************************
-localhost                  : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
-```
-
-[This](playbooks/create-server-install-nginx.yml) is a sample playbook file which create a server and install Nginx.:
-
-```shell
-ansible-playbook -i localhost playbooks/create-server-install-nginx.yml --ssh-common-args='-o StrictHostKeyChecking=no'
-```
-
-> [!NOTE]
-> `-o StrictHostKeyChecking=no`: This option sets `StrictHostKeyChecking` to `no`, which essentially disables SSH host key checking.
-
-```yaml
----
-- name: Create Server and install Nginx
-  hosts: localhost
-  remote_user: phuser
-  tasks:
-    - name: Create Server
-      pidginhost.cloud.server:
-        state: present
-        unique_hostname: true
-        image: string
-        package: string
-        hostname: string
-        project: string
-        password: string
-        ssh_pub_key: string
-        ssh_pub_key_id: string
-        new_ipv4: true
-        new_ipv6: true
-        public_ip: string
-        public_ipv6: string
-        fw_rules_set: string
-        fw_policy_in: ACCEPT
-        fw_policy_out: ACCEPT
-        private_network: string
-        private_address: 198.51.100.42
-        extra_volume_product: string
-        extra_volume_size: 0
-        no_network_acknowledged: true
-      register: server_result
-
-    - name: Wait for server to become reachable
-      # Ansible module used to wait until a connection can be established with the target server.
-      wait_for_connection:
-        # Initial delay before the first check for connectivity.
-        delay: 10
-        # Time in seconds to wait between connection checks.
-        sleep: 10
-        # Maximum time in seconds to wait for the server to become reachable.
-        timeout: 300
-      delegate_to: "{{ server_result.server.networks.public.ipv4 }}"
-
-    - name: Install Nginx
-      # Instructs Ansible to perform the task on the specified target server.
-      delegate_to: "{{ server_result.server.networks.public.ipv4 }}"
-      # Executes the task with elevated privileges (usually as root or using sudo).
-      become: true
-      # Ansible's apt module used for package management on Debian-based systems.
-      ansible.builtin.apt:
-        # Specifies the package name to install (Nginx in this case).
-        name: nginx
-        # Ensures that the package is present on the system. If Nginx is not installed, it will be installed.
-        state: present
-        # Sets the maximum time in seconds to wait for the package lock. If a lock is held by another process, it waits for up to 600 seconds before timing out.
-        lock_timeout: 600
-```
-
-Output should look similar to the following:
-
-```shell
-❯ ansible-playbook -i localhost playbooks/create-server-install-nginx.yml --ssh-common-args='-o StrictHostKeyChecking=no'
-
-PLAY [Create Server and install Nginx] ********************************************************************************************************************************************************************************************************************************************************
-
-TASK [Gathering Facts] ************************************************************************************************************************************************************************************************************************************************************************
-ok: [localhost]
-
-TASK [Create Server] **************************************************************************************************************************************************************************************************************************************************************************
-changed: [localhost]
-
-TASK [Wait for server to become reachable] ****************************************************************************************************************************************************************************************************************************************************
-ok: [localhost -> 176.124.106.104]
-
-TASK [Install Nginx] **************************************************************************************************************************************************************************************************************************************************************************
-changed: [localhost -> 176.124.106.104]
-
-PLAY RECAP ************************************************************************************************************************************************************************************************************************************************************************************
-localhost                  : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0  
-```
-
-[This](inventory/pidginhost.yml) is a sample inventory plugin file which returns the Servers in your account:
-
-Output should look similar to the following:
-
-```shell
-❯ ansible-inventory -i inventory/pidginhost.yml --graph
-@all:
-  |--@ungrouped:
-  |--@ubuntu:
-  |  |--hhtest22332.com
-  |--@status_active:
-  |  |--hhtest22332.com
-  |--@project_z5:
-  |  |--hhtest22332.com
-
-```
-
-```shell
-❯ ansible-inventory -i inventory/pidginhost.yml --host hhtest22332.com
-{
-    "ansible_host": "2.3.4.5",
-    "ansible_user": "phuser",
-    "cpus": 8,
-    "disk_size": 200,
-    "hostname": "hhtest22332.com",
-    "id": 707,
-    "image": "ubuntu22",
-    "memory": 32,
-    "networks": {
-        "private": [],
-        "public": {
-            "interface": "eth0",
-            "ipv4": "2.3.4.5",
-            "ipv6": "22:33:44:1::22"
-        }
-    },
-    "package": "cloudv-6",
-    "project": "z5",
-    "status": "active"
-}
-
-```
-
-## Getting started creating a simple server
-
-> [!NOTE]
-> PidginHost does not require Server hostname to be unique - this functionality is enforced by the
-> `pidginhost.cloud.server` module in conjunction with its `unique_hostname` parameter.
-
-
-Get packages:
-```shell
-ansible localhost -m pidginhost.cloud.packages_info
-```
-Get images:
-```shell
-ansible localhost -m pidginhost.cloud.images_info
-```
-
-Next fill in the needed details like in the bellow example
-
-"Only 'image' and 'package' are mandatory parameters. The other parameters are optional. You must provide 'password' or 'ssh_pub_key', or both. Failure to include either will result in an error, preventing the server creation."
-
-Check documentation:
-
-```shell
-ansible-doc pidginhost.cloud.server
-```
-
-```yaml
----
-- name: Create or delete Servers
-  hosts: localhost
-  tasks:
-    - name: Create Server
-      pidginhost.cloud.server:
-        state: present
-        unique_hostname: true
-        image: string
-        package: string
-        hostname: string
-        project: string
-        password: string
-        ssh_pub_key: string
-        ssh_pub_key_id: string
-        new_ipv4: true
-        new_ipv6: true
-        public_ip: string
-        public_ipv6: string
-        fw_rules_set: string
-        fw_policy_in: ACCEPT
-        fw_policy_out: ACCEPT
-        private_network: string
-        private_address: 198.51.100.42
-        extra_volume_product: string
-        extra_volume_size: 0
-        no_network_acknowledged: true
-```
-
-### Installing the Collection from Ansible Galaxy
-
-Before using this collection, you need to install it with the Ansible Galaxy command-line tool:
-
-```shell
+## Installation & Packaging
+```bash
+# Install the published collection
 ansible-galaxy collection install pidginhost.cloud
+
+# Build from source inside this repo
+ansible-galaxy collection build
+
+# Install the local artifact for testing
+ansible-galaxy collection install ./pidginhost-cloud-<version>.tar.gz -p ./collections
 ```
 
-You can also include it in a `requirements.yml` file and install it
-with `ansible-galaxy collection install -r requirements.yml`, using the format:
-
-```yaml
----
-collections:
-  - name: pidginhost.cloud
+## Authentication
+Export your API token before running modules or playbooks:
+```bash
+export PIDGINHOST_TOKEN=your-token-here
 ```
+Passing the token as a playbook variable works, but environment variables keep secrets out of files and support the inventory plugin.
 
-Note that if you install the collection from Ansible Galaxy, it will not be upgraded automatically when you upgrade
-the `ansible` package.
-To upgrade the collection to the latest available version, run the following command:
+## Using the Modules
+- Discover packages, images, and existing resources:
+  ```bash
+  ansible localhost -m pidginhost.cloud.packages_info
+  ansible localhost -m pidginhost.cloud.images_info
+  ansible localhost -m pidginhost.cloud.servers_info
+  ```
+- Create or delete servers via the sample playbook:
+  ```bash
+  ansible-playbook -i inventory/pidginhost.yml playbooks/server.yml \
+    -e "server_state=present server_hostname=my-host.example server_image=ubuntu22 \
+        server_package=cloudv-2 server_ssh_pub_key='ssh-ed25519 AAAA... user@example.com'"
+  ```
+- Resize, attach volumes, manage firewall rule sets, and assign IPs with dedicated modules such as `pidginhost.cloud.server_action_resize`, `pidginhost.cloud.volume`, `pidginhost.cloud.firewall`, and `pidginhost.cloud.ip_action`. Consult `ansible-doc <module>` for full argument specs.
 
-```shell
-ansible-galaxy collection install pidginhost.cloud --upgrade
+## Dynamic Inventory
+`plugins/inventory/servers.py` turns PidginHost servers into inventory hosts with cached facts and optional grouping:
+```bash
+ansible-inventory -i inventory/pidginhost.yml --graph
+ansible-inventory -i inventory/pidginhost.yml --host my-host.example
 ```
+By default each host exposes network details and sets `ansible_user` to `phuser`; adjust `attributes`, `compose`, or `groups` in `inventory/pidginhost.yml` as needed.
 
-## More information
+## Example Playbooks
+- `playbooks/profile_info.yml` – verifies authentication and prints account data (safe smoke test).
+- `playbooks/install-nginx.yml` – bootstraps an existing server using a temporary in-memory inventory entry.
+- Additional playbooks demonstrate volume, firewall, and IP automation patterns; copy them when building integration tests.
 
-- [Ansible Collection overview](https://github.com/ansible-collections/overview)
-- [Ansible User guide](https://docs.ansible.com/ansible/devel/user_guide/index.html)
-- [Ansible Developer guide](https://docs.ansible.com/ansible/devel/dev_guide/index.html)
-- [Ansible Collections Checklist](https://github.com/ansible-collections/overview/blob/main/collection_requirements.rst)
-- [Ansible Community code of conduct](https://docs.ansible.com/ansible/devel/community/code_of_conduct.html)
-- [The Bullhorn (the Ansible Contributor newsletter)](https://us19.campaign-archive.com/home/?u=56d874e027110e35dea0e03c1&id=d6635f5420)
-- [News for Maintainers](https://github.com/ansible-collections/news-for-maintainers)
+## Testing & Linting
+- Run collection sanity checks: `ansible-test sanity --python 3.11`.
+- Lint example playbooks: `ansible-lint playbooks/*.yml`.
+- Use `ansible-playbook -i localhost playbooks/profile_info.yml -v` to confirm connectivity without provisioning resources.
 
-## Licensing
+## Contributing
+Follow the conventions in `AGENTS.md`: mirror snake_case filenames under `plugins/modules/`, reuse helpers from `module_utils/common.py`, and keep commit subjects short and imperative (e.g., `Add server resize helper`). Squash commits before PRs and document verification commands. Never commit real tokens—rely on environment variables or `ansible-vault`. Clear the `./tmp/` cache when switching tenants.
 
-GNU General Public License v3.0 or later.
-
-See [LICENSE](https://www.gnu.org/licenses/gpl-3.0.txt) to see the full text.
+## License
+Released under the GNU General Public License v3.0 or later. See [`LICENSE`](LICENSE) for the full text.

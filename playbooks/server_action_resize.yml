@@ -1,42 +1,104 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/server_action_resize.yml -v
-
-- name: Resize a Server Volume or upgrade Server package
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/server_action_resize.yml \
+#     -e "server_resize_hostname=my-host.example \
+#         server_resize_disk=true \
+#         server_resize_volume_alias=data-volume \
+#         server_resize_size_gigabytes=60 \
+#         server_resize_product=fast-storage"
+- name: Resize server resources
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    server_resize_hostname: null
+    server_resize_id: null
+    server_resize_disk: true
+    server_resize_size_gigabytes: null
+    server_resize_volume_alias: null
+    server_resize_product: null
+    server_resize_project: null
+    server_resize_package_name: null
+    server_resize_timeout: 600
+
   tasks:
-    - name: Resize a Server Volume by hostname
-      pidginhost.cloud.server_action_resize:
-        state: present
-        server_hostname: hhtest22332.com
-        disk: true
-        size_gigabytes: 60
-        volume_alias: Volume4444
-        product: fast-storage
+    - name: Normalize resize inputs
+      ansible.builtin.set_fact:
+        server_resize_disk_bool: "{{ server_resize_disk | bool }}"
+        server_resize_size_value: "{{ server_resize_size_gigabytes | default(omit) }}"
+        server_resize_product_value: "{{ server_resize_product | default(omit) }}"
+        server_resize_project_value: "{{ server_resize_project | default(omit) }}"
 
-    - name: Resize a Server Volume by id
-      pidginhost.cloud.server_action_resize:
-        state: present
-        server_id: 23423
-        disk: true
-        size_gigabytes: 60
-        volume_alias: Volume4444
-        product: fast-storage
+    - name: Validate target input
+      ansible.builtin.assert:
+        that:
+          - server_resize_hostname is not none or server_resize_id is not none
+        fail_msg: "Provide either server_resize_hostname or server_resize_id to target a server."
 
-    - name: Upgrade Server package by hostname
-      pidginhost.cloud.server_action_resize:
-        state: present
-        server_hostname: hhtest22332.com
-        disk: false
-        package_name: cloudv-3
+    - name: Validate resize parameters
+      ansible.builtin.assert:
+        that:
+          - (server_resize_disk_bool and server_resize_volume_alias is not none and server_resize_size_gigabytes is not none and server_resize_product is not none)
+            or ((not server_resize_disk_bool) and server_resize_package_name is not none)
+        fail_msg: |
+          When resizing disk set server_resize_disk=true and provide server_resize_volume_alias, server_resize_size_gigabytes, and server_resize_product. When upgrading a package set server_resize_disk=false and provide server_resize_package_name.
 
-    - name: Upgrade Server package by id
-      pidginhost.cloud.server_action_resize:
-        state: present
-        server_id: 234234
-        disk: false
-        package_name: cloudv-3
+    - name: Build resize arguments
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ {
+          'state': 'present',
+          'disk': server_resize_disk | bool,
+          'timeout': server_resize_timeout | int
+        } }}"
+
+    - name: Include server target hostname
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'server_hostname': server_resize_hostname}) }}"
+      when: server_resize_hostname not in (none, '')
+
+    - name: Include server target id
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'server_id': server_resize_id}) }}"
+      when: server_resize_id not in (none, '')
+
+    - name: Include volume size
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'size_gigabytes': server_resize_size_gigabytes}) }}"
+      when:
+        - server_resize_disk_bool
+        - server_resize_size_gigabytes is not none
+
+    - name: Include volume alias
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'volume_alias': server_resize_volume_alias}) }}"
+      when:
+        - server_resize_disk_bool
+        - server_resize_volume_alias not in (none, '')
+
+    - name: Include volume product
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'product': server_resize_product}) }}"
+      when:
+        - server_resize_disk_bool
+        - server_resize_product not in (none, '')
+
+    - name: Include volume project
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'project': server_resize_project}) }}"
+      when:
+        - server_resize_disk_bool
+        - server_resize_project is not none
+
+    - name: Include package upgrade parameter
+      ansible.builtin.set_fact:
+        server_resize_args: "{{ server_resize_args | combine({'package_name': server_resize_package_name}) }}"
+      when: not server_resize_disk_bool
+
+    - name: Apply resize action
+      pidginhost.cloud.server_action_resize: "{{ server_resize_args }}"
+      register: server_resize_result
+
+    - name: Show resize action result
+      ansible.builtin.debug:
+        var: server_resize_result.action

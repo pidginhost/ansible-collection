@@ -1,36 +1,45 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/firewall.yml -v
-
-- name: Create firewalls rules set, add rules to rules set or delete rules set.
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/firewall.yml \
+#    -e '{"firewall_ruleset_name":"my-nginx-rules","firewall_create_ruleset":true,"firewall_rules":[{"direction":"in","action":"ACCEPT","protocol":"tcp","dport":"80","source":"0.0.0.0/0"}]}'
+- name: Manage firewall rule sets
   hosts: localhost
   connection: local
   gather_facts: false
 
+  vars:
+    firewall_ruleset_name: "example-ruleset"
+    firewall_create_ruleset: true
+    firewall_delete_ruleset: false
+    firewall_rules: []        # populate with dictionaries matching module options
+
   tasks:
-    - name: Delete firewall rules set
+    - name: Ensure rule set is absent
       pidginhost.cloud.firewall:
         state: absent
-        rules_set_name: Firewall rules set name
+        rules_set_name: "{{ firewall_ruleset_name }}"
+      when: firewall_delete_ruleset
 
-    - name: Create firewall rules set
+    - name: Ensure rule set exists
       pidginhost.cloud.firewall:
         state: present
         create_rules_set: true
-        rules_set_name: Firewall rules set name
+        rules_set_name: "{{ firewall_ruleset_name }}"
+      when: firewall_create_ruleset
 
-    - name: Add firewall rules to rules set
+    - name: Apply firewall rules
       pidginhost.cloud.firewall:
         state: present
-        rules_set_name: New Firewall1
+        rules_set_name: "{{ firewall_ruleset_name }}"
         create_rules_set: false
-        direction: in
-        action: ACCEPT
-        protocol: tcp
-        source: str
-        sport: str
-        destination: str
-        dport: 22
-        enabled: true
-        position: 0
+        direction: "{{ item.direction }}"
+        action: "{{ item.action }}"
+        protocol: "{{ item.protocol }}"
+        source: "{{ item.source | default(omit, true) }}"
+        sport: "{{ item.sport | default(omit, true) }}"
+        destination: "{{ item.destination | default(omit, true) }}"
+        dport: "{{ item.dport | default(omit, true) }}"
+        enabled: "{{ item.enabled | default(true) | bool }}"
+        position: "{{ item.position | default(omit, true) }}"
+      loop: "{{ firewall_rules }}"
+      when: firewall_rules | length > 0

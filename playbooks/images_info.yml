@@ -1,13 +1,20 @@
 ---
-# code: language=ansible
-# Running this playbook:
-# ansible-playbook -i localhost playbooks/images_info.yml -v
-
-- name: Get PidginHost images info
+# Usage:
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/images_info.yml
+- name: Retrieve cloud images
   hosts: localhost
   connection: local
   gather_facts: false
+
+  vars:
+    images_state: present
+
   tasks:
-    - name: Print all images data
+    - name: Query image catalogue
       pidginhost.cloud.images_info:
-        state: present
+        state: "{{ images_state }}"
+      register: images_result
+
+    - name: Show images
+      ansible.builtin.debug:
+        var: images_result.images

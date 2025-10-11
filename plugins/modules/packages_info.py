@@ -21,7 +21,10 @@ description:
 
 author:
   - Popescu Andrei Cristian (@shbpty)
-  
+
+extends_documentation_fragment:
+  - pidginhost.cloud.pidginhost
+
 """
 
 EXAMPLES = r"""
@@ -31,66 +34,6 @@ EXAMPLES = r"""
 
 """
 
-RETURN = r"""
-account:
-  description: 
-    - Represents the information about packages products.
-  type: dict
-  returned: always
-  sample:
-    changed: false
-    failed: false
-    account:
-      count: 10
-      next: null
-      previous: null
-      results:
-        - id: 12
-          name: "CloudV 2"
-          slug: "cloudv-2"
-        - id: 2
-          name: "CloudV 4"
-          slug: "cloudv-4"
-        - id: 13
-          name: "CloudV 1"
-          slug: "cloudv-1"
-        - id: 5
-          name: "CloudV 7"
-          slug: "cloudv-7"
-        - id: 6
-          name: "CloudV 8"
-          slug: "cloudv-8"
-        - id: 4
-          name: "CloudV 6"
-          slug: "cloudv-6"
-        - id: 1
-          name: "CloudV 3"
-          slug: "cloudv-3"
-        - id: 45
-          name: "CloudV 0"
-          slug: "cloudv-0"
-        - id: 3
-          name: "CloudV 5"
-          slug: "cloudv-5"
-        - id: 7
-          name: "CloudV 9"
-          slug: "cloudv-9"
-error:
-  description: PidginHost API error.
-  returned: failure
-  type: dict
-  sample:
-    Message: PidginHost API error, request to {url} failed.
-    Response: response.text
-    Status Code: response.status_code
-msg:
-  description: Action result information.
-  returned: always
-  type: str
-  sample:
-    - Current account information
-    - Current account information not found
-"""
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
