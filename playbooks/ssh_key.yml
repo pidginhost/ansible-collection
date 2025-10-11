@@ -5,7 +5,7 @@
 #    -e '{"ssh_key_state":"present","ssh_keys_desired":["ssh-ed25519 AAAA... user@example"]}'
 #   # Remove Key
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/ssh_key.yml \
-#    -e '{"ssh_key_state":"absent","ssh_keys_remove":["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHc+i7ZBW64xoh3hFg8xoZUsuied9JH77nSWbsP/8Q/X andrei.popescu.c@gmail.com]}'
+#    -e '{"ssh_key_state":"absent","ssh_keys_remove":["ssh-ed25519 AAAA... user@example.com]}'
 - name: Manage SSH public keys
   hosts: localhost
   connection: local

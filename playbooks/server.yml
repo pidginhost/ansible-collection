@@ -6,7 +6,7 @@
 #         server_hostname=my-host.example \
 #         server_image=ubuntu22 \
 #         server_package=cloudv-2 \
-#         server_ssh_pub_key='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHc+i7ZBW64xoh3hFg8xoZUsuied9JH77nSWbsP/8Q/X andrei.popescu.c@gmail.com'"
+#         server_ssh_pub_key='ssh-ed25519 AAAA... user@example.com'"
 #
 #   # Delete by hostname (requires unique hostname)
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/server.yml \

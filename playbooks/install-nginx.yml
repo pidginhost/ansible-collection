@@ -1,7 +1,7 @@
 ---
 # Usage:
 # ansible-playbook -i inventory/pidginhost.yml playbooks/install-nginx.yml \
-#   -e "target_ip=176.124.106.82 target_user=phuser" -vv
+#   -e "target_ip=176.0.0.0 target_user=phuser" -vv
 
 # Play 1: create an ephemeral host with the right connection vars
 - name: Define target host for configuration

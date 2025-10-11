@@ -3,12 +3,12 @@
 #   # Attach a floating IP
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/ip_action.yml \
 #     -e "ip_action_state=present \
-#         ip_address=198.51.100.10 \
+#         ip_address=198.0.0.0 \
 #         ip_server_hostname=my-host.example"
 #   # Detache a floating IP
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/ip_action.yml \
 #     -e "ip_action_state=absent \
-#         ip_address=198.51.100.10 \
+#         ip_address=198.0.0.0 \
 #         ip_server_hostname=my-host.example"
 - name: Manage floating IP attachment
   hosts: localhost
