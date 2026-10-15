@@ -18,6 +18,7 @@ homepage: https://github.com/pidginhost/ansible-collection
 issues: https://github.com/pidginhost/ansible-collection/issues
 build_ignore:
   - .claude
+  - .codex-flow
   - .idea
   - .gitignore
   - .remember
