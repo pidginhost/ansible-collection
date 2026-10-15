@@ -9,6 +9,7 @@ __metaclass__ = type
 import ipaddress
 import json
 import time
+from collections import Counter
 from urllib.parse import urlencode
 
 from ansible.module_utils.basic import env_fallback
@@ -18,6 +19,9 @@ from ansible.module_utils.urls import fetch_url
 BASE_URL = "https://www.pidginhost.com"
 TOKEN_ENV_VARS = ["PIDGINHOST_ACCESS_TOKEN", "PIDGINHOST_TOKEN"]
 POLL_INTERVAL = 5
+RESUBMIT_DELAY = 30
+# How the API words a refusal that ran nothing because another operation held the server.
+BUSY = "another server operation is in progress"
 SERVERS = "/api/cloud/servers/"
 CLUSTERS = "/api/kubernetes/clusters/"
 
@@ -232,6 +236,45 @@ class PidginHostAPI(object):
                     % (len(found), kind, match, ", ".join(str(i.get("id")) for i in found))
             )
         return found[0] if found else None
+
+    def activity(self, server_id):
+        """Count the entries in a server's activity log, so that later ones can be told apart."""
+        logs = self.get("%s%s/activity/" % (SERVERS, server_id))["logs"]
+        return Counter((entry["date"], entry["message"]) for entry in logs)
+
+    def wait_activity(self, server_id, before, refusals, finished, what, resubmit=None, **failure):
+        """Wait until finished(new activity messages) returns a value, and return it.
+
+        The API queues server operations and accepts them with 202 before they run, so a refusal only
+        shows up in the activity log: fail as soon as a new entry starts with one of refusals. A refusal
+        because another operation was still running means nothing ran; with resubmit, the request is
+        sent again, at most every RESUBMIT_DELAY seconds, until it runs or the timeout passes.
+        """
+        state = {"before": before, "next_try": 0}
+
+        def outcome():
+            logs = self.get("%s%s/activity/" % (SERVERS, server_id))["logs"]
+            current = Counter((entry["date"], entry["message"]) for entry in logs)
+            counts = current - state["before"]
+            fresh = [entry["message"] for entry in logs if counts[(entry["date"], entry["message"])]]
+            refused = next((m for m in fresh if m.startswith(tuple(refusals))), None)
+            if refused and resubmit and BUSY in refused:
+                if time.monotonic() >= state["next_try"]:
+                    state["before"] = current
+                    state["next_try"] = time.monotonic() + RESUBMIT_DELAY
+                    resubmit()
+                return None
+            if refused:
+                return False, refused
+            value = finished(fresh)
+            return None if value is None else (True, value)
+
+        result = self.wait_for(outcome, lambda value: value is not None)
+        if result is None:
+            self.module.fail_json(changed=True, msg="%s was not confirmed in time." % what, **failure)
+        if not result[0]:
+            self.module.fail_json(changed=True, msg="%s failed: %s" % (what, result[1]), **failure)
+        return result[1]
 
     def find_ip(self, address):
         """Return (version, owned public IP or None) for an address."""

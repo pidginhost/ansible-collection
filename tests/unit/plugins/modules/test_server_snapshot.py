@@ -26,6 +26,7 @@ def with_server(api, status="active"):
 
 
 def test_present_creates_and_waits_until_ready(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     api.add("GET", SERVERS, listing({"id": 42, "hostname": "web1"}))
     with_server(api)
     api.add("GET", SNAPS, [])
@@ -77,6 +78,7 @@ def test_present_without_wait(api, run):
 
 
 def test_present_timeout_fails(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     with_server(api)
     api.add("GET", SNAPS, [])
     api.add("POST", SNAPS, {"queued": True}, status=202)
@@ -88,6 +90,7 @@ def test_present_timeout_fails(api, run):
 
 
 def test_absent_deletes_and_waits_until_gone(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     with_server(api)
     api.add("GET", SNAPS, [snap()])
     api.add("GET", SNAPS, [snap(state="delete")])
@@ -114,6 +117,7 @@ def test_absent_missing_snapshot_is_unchanged(api, run):
 
 
 def test_absent_delete_timeout_fails(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     with_server(api)
     api.add("GET", SNAPS, [snap()])
     api.add("DELETE", SNAPS + "before-upgrade/", {"queued": True}, status=202)
@@ -189,6 +193,7 @@ def test_existing_preparing_snapshot_times_out(api, run):
 
 
 def test_unknown_snapshot_state_is_not_ready(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     with_server(api)
     api.add("GET", SNAPS, [])
     api.add("GET", SNAPS, [snap(state="delete")])
@@ -251,3 +256,55 @@ def test_rollback_without_wait_does_not_read_activity(api, run):
     assert not result.failed
     assert result.changed
     assert not api.requests("GET", SERVER + "activity/")
+
+
+def test_absent_reports_refused_delete_at_once(api, run):
+    # The API answers 202 and the queued task only logs the refusal.
+    with_server(api)
+    api.add("GET", SNAPS, [snap()])
+    api.add("DELETE", SNAPS + "before-upgrade/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [{
+        "date": "2026-01-01 12:00",
+        "message": 'Snapshot "before-upgrade" could not be deleted (ci).'}]})
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", state="absent", timeout=5)
+
+    assert result.failed
+    assert result.changed
+    assert "could not be deleted" in result["msg"]
+    assert len(api.requests("GET", SERVER + "activity/")) == 2
+
+
+def test_present_reports_refused_create_at_once(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [])
+    api.add("POST", SNAPS, {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [
+        {"date": "2026-01-01 12:00", "message": 'Snapshot "before-upgrade" could not be created.'}]})
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", timeout=5)
+
+    assert result.failed
+    assert result.changed
+    assert "could not be created" in result["msg"]
+
+
+def test_busy_delete_is_resubmitted(api, run):
+    busy = {"date": "2026-01-01 12:00",
+            "message": 'Snapshot "before-upgrade" was not deleted because another server operation is in progress.'}
+    with_server(api)
+    api.add("GET", SNAPS, [snap()])
+    api.add("GET", SNAPS, [snap()])
+    api.add("GET", SNAPS, [])
+    api.add("DELETE", SNAPS + "before-upgrade/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [busy]})
+    api.add("GET", SERVER + "activity/", {"logs": [busy]})
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", state="absent", timeout=120)
+
+    assert not result.failed, result.result
+    assert result.changed
+    assert [c[0] for c in api.writes()] == ["DELETE", "DELETE"]

@@ -54,6 +54,9 @@ options:
   wait:
     description:
       - Wait until the server reports the requested rescue mode.
+      - The API queues the change and accepts it before it runs. When the server activity log reports that it
+        could not run because another operation held the server, the change is sent again until it runs or
+        O(timeout) passes. Any other refusal fails the task at once with its message.
     type: bool
     default: true
 """
@@ -116,18 +119,29 @@ def main():
     if module.check_mode:
         module.exit_json(changed=True, server=server)
 
+    before = api.activity(server["id"]) if params["wait"] else None
     if rescue:
-        api.post(path + "rescue/enter/", drop_none(dict(iso=params["iso"])))
+        refusals = ("Could not boot from ISO", "Could not enter rescue mode")
+
+        def submit():
+            api.post(path + "rescue/enter/", drop_none(dict(iso=params["iso"])))
     else:
-        api.post(path + "rescue/exit/")
+        refusals = ("Could not exit ISO boot", "Could not exit rescue mode")
+
+        def submit():
+            api.post(path + "rescue/exit/")
+    submit()
     if not params["wait"]:
         module.exit_json(changed=True, server=server)
-    done = api.wait_for(lambda: api.get(path), lambda s: s["rescue_mode"] == rescue)
-    if not done:
-        module.fail_json(
-            changed=True, server=server,
-            msg="Server %s did not %s rescue mode in time." % (server["id"], "enter" if rescue else "leave"),
-        )
+
+    def settled(fresh):
+        current = api.get(path)
+        return current if current["rescue_mode"] == rescue else None
+
+    done = api.wait_activity(
+        server["id"], before, refusals, settled,
+        "%s rescue mode on server %s" % ("Entering" if rescue else "Leaving", server["id"]),
+        resubmit=submit, server=server)
     module.exit_json(changed=True, server=done)
 
 

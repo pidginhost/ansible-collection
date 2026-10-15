@@ -62,7 +62,9 @@ options:
       - Wait until the snapshot is ready after creation, or gone after deletion.
       - Also wait for an earlier creation or deletion that is still in progress.
       - With O(state=rollback), wait for a new completion entry in the server activity log.
-      - Fail if rollback completion cannot be confirmed before O(timeout).
+      - The API queues snapshot work and accepts it before it runs. When the server activity log reports that it
+        could not run because another operation held the server, the request is sent again until it runs or
+        O(timeout) passes. Any other refusal or failure fails the task at once with its message.
     type: bool
     default: true
 """
@@ -103,8 +105,6 @@ snapshot:
     is_current: false
 """
 
-from collections import Counter
-
 from ansible.module_utils.basic import AnsibleModule
 
 from ..module_utils.common import SERVERS, PidginHostAPI, drop_none, pidginhost_argument_spec
@@ -116,34 +116,6 @@ def wait_ready(api, module, find, changed):
         module.fail_json(changed=changed, msg="Snapshot %s was not ready in time." % module.params["name"],
                          snapshot={"name": module.params["name"]})
     return snapshot
-
-
-def activity_counts(logs):
-    return Counter((entry["date"], entry["message"]) for entry in logs)
-
-
-def wait_rollback(api, module, path, before, snapshot):
-    prefix = 'Rollback to snapshot "%s" ' % module.params["name"]
-
-    def outcome():
-        logs = api.get(path + "activity/")["logs"]
-        fresh = activity_counts(logs) - before
-        for entry in logs:
-            message = entry["message"]
-            if not fresh[(entry["date"], message)] or not message.startswith(prefix):
-                continue
-            if message.startswith((prefix + "completed.", prefix + "completed (")):
-                return "completed"
-            if message.startswith((prefix + "could not be completed", prefix + "was not started")):
-                return "failed"
-        return None
-
-    # The server remains active while the rollback is queued and running.
-    result = api.wait_for(outcome, lambda value: value is not None)
-    if result != "completed":
-        module.fail_json(changed=True, snapshot=snapshot,
-                         msg="Rollback to snapshot %s %s." % (
-                             module.params["name"], "failed" if result else "was not confirmed in time"))
 
 
 def main():
@@ -180,11 +152,25 @@ def main():
             module.exit_json(changed=False, snapshot=snapshot)
         if module.check_mode:
             module.exit_json(changed=True, snapshot={})
-        api.post(path, drop_none(dict(
-            name=name, description=params["description"], include_memory=params["include_memory"])))
+        before = api.activity(server["id"]) if params["wait"] else None
+
+        def create():
+            api.post(path, drop_none(dict(
+                name=name, description=params["description"], include_memory=params["include_memory"])))
+
+        create()
         if not params["wait"]:
             module.exit_json(changed=True, snapshot={"name": name})
-        snapshot = wait_ready(api, module, find, changed=True)
+
+        def ready(fresh):
+            # The snapshot is listed with a state until it is complete.
+            found = find()
+            return found if found and found["state"] == "" else None
+
+        prefix = 'Snapshot "%s" ' % name
+        snapshot = api.wait_activity(
+            server["id"], before, (prefix + "could not be created", prefix + "was not created"), ready,
+            "Snapshot %s" % name, resubmit=create, snapshot={"name": name})
         module.exit_json(changed=True, snapshot=snapshot)
 
     if state == "absent":
@@ -193,20 +179,44 @@ def main():
         changed = snapshot["state"] != "delete"
         if module.check_mode:
             module.exit_json(changed=changed, snapshot={})
-        if changed:
+        if not params["wait"]:
+            if changed:
+                api.delete("%s%s/" % (path, name))
+            module.exit_json(changed=changed, snapshot={})
+        if not changed:
+            # A deletion already in progress: only wait for it.
+            if not api.wait_for(lambda: find() is None, bool):
+                module.fail_json(changed=False, msg="Snapshot %s was not deleted in time." % name, snapshot=snapshot)
+            module.exit_json(changed=False, snapshot={})
+        before = api.activity(server["id"])
+
+        def delete():
             api.delete("%s%s/" % (path, name))
-        if params["wait"] and not api.wait_for(lambda: find() is None, bool):
-            module.fail_json(changed=changed, msg="Snapshot %s was not deleted in time." % name, snapshot=snapshot)
-        module.exit_json(changed=changed, snapshot={})
+
+        delete()
+        prefix = 'Snapshot "%s" ' % name
+        api.wait_activity(
+            server["id"], before, (prefix + "could not be deleted", prefix + "was not deleted"),
+            lambda fresh: True if find() is None else None, "Snapshot %s" % name, resubmit=delete, snapshot=snapshot)
+        module.exit_json(changed=True, snapshot={})
 
     if not snapshot:
         module.fail_json(msg="Snapshot %s not found on server %s." % (name, server["id"]))
     if module.check_mode:
         module.exit_json(changed=True, snapshot=snapshot)
-    before = activity_counts(api.get(server_path + "activity/")["logs"]) if params["wait"] else None
-    api.post("%s%s/rollback/" % (path, name))
+    before = api.activity(server["id"]) if params["wait"] else None
+
+    def rollback():
+        api.post("%s%s/rollback/" % (path, name))
+
+    rollback()
     if params["wait"]:
-        wait_rollback(api, module, server_path, before, snapshot)
+        prefix = 'Rollback to snapshot "%s" ' % name
+        # The server remains active while the rollback is queued and running, so only the log tells.
+        api.wait_activity(server["id"], before, (prefix + "could not be completed", prefix + "was not started"),
+                          lambda fresh: True if any(m.startswith((prefix + "completed.", prefix + "completed ("))
+                                                    for m in fresh) else None,
+                          "Rollback to snapshot %s" % name, resubmit=rollback, snapshot=snapshot)
     module.exit_json(changed=True, snapshot=snapshot)
 
 
