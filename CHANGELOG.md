@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-10-15
 
 ### Added
 - New modules manage server snapshots, rescue mode, public IP allocation and reverse DNS, floating IPs, private networks and object storage buckets.
