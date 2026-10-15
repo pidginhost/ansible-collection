@@ -127,7 +127,7 @@ Integration tests create, change and delete real resources, so run them against 
 use `ansible-ci-...` and private networks use documentation subnets; each target removes what it created.
 ```bash
 cp tests/integration/integration_config.yml.template tests/integration/integration_config.yml   # add the token
-ansible-test integration --docker default pidginhost
+ansible-test integration --docker default                               # every target except kubernetes
 ansible-test integration --docker default --allow-disabled kubernetes   # slow, creates a billed cluster
 ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml   # remove leftovers
 ```

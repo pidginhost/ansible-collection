@@ -85,10 +85,11 @@ jobs:
         env:
           WITH_KUBERNETES: ${{ inputs.kubernetes }}
         run: |
+          # No target pattern: every enabled target runs; the disabled kubernetes target only on request.
           if [ "$WITH_KUBERNETES" = "true" ]; then
-            ansible-test integration --docker default --color yes --allow-disabled pidginhost
+            ansible-test integration --docker default --color yes --allow-disabled
           else
-            ansible-test integration --docker default --color yes pidginhost
+            ansible-test integration --docker default --color yes
           fi
 
       - name: Remove leftovers from the CI account
