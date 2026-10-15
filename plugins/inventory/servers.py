@@ -2,7 +2,6 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
@@ -11,168 +10,158 @@ DOCUMENTATION = r"""
 name: servers
 author:
   - Popescu Andrei Cristian (@shbpty)
-
-short_description: Servers dynamic inventory plugin
+short_description: PidginHost cloud servers inventory source
 version_added: "0.2.0"
 description:
-  - Servers dynamic inventory plugin.
-  - Hosts missing a value for a keyed group are silently skipped instead of
-    raising an error, simplifying usage when optional metadata is absent.
+  - Builds an inventory of the PidginHost cloud servers in an account.
+  - The configuration file name must end with C(pidginhost.yml), C(servers.yml) or C(inventory.yml).
+  - Sets C(ansible_user) to the default login user of the server image, except for servers running a custom OS.
+  - Hosts missing a value for a keyed group are skipped instead of raising an error.
 extends_documentation_fragment:
   - constructed
   - inventory_cache
 options:
   plugin:
     description:
-      - The name of the this inventory plugin C(pidginhost.cloud.servers).
+      - The name of this inventory plugin.
     required: true
     choices: ["pidginhost.cloud.servers"]
   token:
     description:
-      - PidginHost API token.
-      - There are several environment variables which can be used to provide this value.
-      - C(PIDGINHOST_TOKEN), C(PIDGINHOST_ACCESS_TOKEN)
+      - PidginHost API token. Templates are allowed.
     type: str
-    required: false
+    env:
+      - name: PIDGINHOST_ACCESS_TOKEN
+      - name: PIDGINHOST_TOKEN
+  timeout:
+    description:
+      - Seconds to wait for each API request.
+    type: int
+    default: 60
   attributes:
     description:
-      - Servers attributes to include as host variables.
-      - Consult the API documentation U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_retrieve) for attribute examples.
+      - Server attributes to set as host variables.
+      - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_list) for the available attributes.
     type: list
     elements: str
-    required: false
+    default: [id, hostname, project, image, package, generation, status, cpus, memory, disk_size, networks]
 """
 
 EXAMPLES = r"""
+# pidginhost.yml
 plugin: pidginhost.cloud.servers
 cache: true
 cache_plugin: ansible.builtin.jsonfile
 cache_connection: ./tmp/pidginhost_servers_inventory
 cache_timeout: 300
-#
-#  By default, this plugin will consult the following environment variables for the API token:
-#  PIDGINHOST_TOKEN, PIDGINHOST_ACCESS_TOKEN
-#
-#  The API token can also be set statically (but please, avoid committing secrets):
-#  token: hunter1
-#
-#  Or, lookup plugins can be used:
-#  token: "{{ lookup('ansible.builtin.pipe', '/script/which/echoes/token.sh') }}"
-#  token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_TOKEN') }}"
-#
-attributes:
-  - cpus
-  - disk_size
-  - hostname
-  - id
-  - image
-  - memory
-  - networks
-  - package
-  - project
-  - status
+# The token is read from PIDGINHOST_ACCESS_TOKEN or PIDGINHOST_TOKEN when not set here.
+# token: "{{ lookup('ansible.builtin.env', 'PIDGINHOST_TOKEN') }}"
 compose:
   ansible_host: networks.public.ipv4
 keyed_groups:
   - key: status
     prefix: status
-    separator: _
   - key: project
     prefix: project
 groups:
   ubuntu: "'ubuntu' in image"
 """
 
-import os
+import json
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+
 from ansible.errors import AnsibleParserError
+from ansible.module_utils.common.text.converters import to_text
+from ansible.module_utils.urls import open_url
 from ansible.plugins.inventory import BaseInventoryPlugin, Cacheable, Constructable
-from ..module_utils.common import PidginHostsConstants, PidginHostCommonInventory
+
+from ..module_utils.common import BASE_URL, SERVERS
 
 
-class InventoryModule(BaseInventoryPlugin, Cacheable, Constructable):
-    NAME = 'pidginhost.cloud.servers'  # used internally by Ansible, it should match the file name
-    TOKEN_ENV_VARS = (
-        "PIDGINHOST_ACCESS_TOKEN",
-        "PIDGINHOST_TOKEN",
-    )
-    VALID_ENDSWITH = (
-        "inventory.yml",
-        "pidginhost.yml",
-        "servers.yml",
-    )
+class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
+    NAME = "pidginhost.cloud.servers"
 
     def verify_file(self, path):
-        valid = False
-        if super(InventoryModule, self).verify_file(path):
-            if path.endswith(InventoryModule.VALID_ENDSWITH):
-                valid = True
-            else:
-                self.display.v(
-                    msg="Skipping due to inventory source file name mismatch "
-                        + "the inventory file name must end with one of the following: "
-                        + ", ".join(InventoryModule.VALID_ENDSWITH)
-                )
-        return valid
+        return super(InventoryModule, self).verify_file(path) and path.endswith(
+            ("pidginhost.yml", "pidginhost.yaml", "servers.yml", "servers.yaml", "inventory.yml", "inventory.yaml"))
 
-    def _populate(self, config, token):
-        servers = PidginHostCommonInventory(token).get_inventory()
+    def _get(self, token, path, page=1):
+        url = BASE_URL + path + ("?" + urlencode({"page": page}) if page > 1 else "")
+        try:
+            resp = open_url(url, method="GET", timeout=self.get_option("timeout"), unredirected_headers=["Authorization"], headers={
+                "Authorization": "Token %s" % token, "Accept": "application/json"})
+            return json.loads(to_text(resp.read()))
+        except HTTPError as e:
+            raise AnsibleParserError("PidginHost API GET %s returned HTTP %s: %s" % (path, e.code, to_text(e.read())))
+        except (OSError, URLError, ValueError) as e:
+            raise AnsibleParserError("PidginHost API GET %s failed: %s" % (path, e))
+
+    def _list(self, token, path):
+        items = []
+        page = 1
+        while True:
+            data = self._get(token, path, page)
+            items.extend(data["results"])
+            if not data.get("next"):
+                return items
+            page += 1
+
+    def _login_user(self, token, server, users):
+        if server.get("custom_os"):
+            return None
+        if server.get("image") in users:
+            return users[server["image"]]
+        # Retired images leave the catalog; the server detail still names the user.
+        return self._get(token, "%s%s/" % (SERVERS, server["id"])).get("username")
+
+    def _fetch(self, token):
+        users = dict((i["slug"], i["default_username"]) for i in self._list(token, "/api/cloud/images/"))
+        servers = self._list(token, SERVERS)
         for server in servers:
-            host_name = server["hostname"]
-            if not host_name:
+            server["login_user"] = self._login_user(token, server, users)
+        return servers
+
+    def _populate(self, servers):
+        strict = self.get_option("strict")
+        for server in servers:
+            host = server.get("hostname")
+            if not host:
                 continue
-            self.inventory.add_host(host_name)
+            self.inventory.add_host(host)
+            for attribute in self.get_option("attributes"):
+                if attribute in server:
+                    self.inventory.set_variable(host, attribute, server[attribute])
+            if server.get("login_user"):
+                self.inventory.set_variable(host, "ansible_user", server["login_user"])
 
-            for k, v in server.items():
-                attributes = config.get("attributes", [])
-                if k in attributes:
-                    self.inventory.set_variable(host_name, k, v)
-                self.inventory.set_variable(host_name, 'ansible_user', PidginHostsConstants.PH_DEFAULT_USER)
-            host_vars = self.inventory.get_host(host_name).get_vars()
-
-            self._set_composite_vars(
-                self.get_option("compose"), host_vars, host_name, True
-            )
-            self._add_host_to_composed_groups(
-                self.get_option('groups'), host_vars, host_name, True
-            )
-
-            self._add_host_to_keyed_groups(
-                self.get_option('keyed_groups'),
-                host_vars,
-                host_name,
-                False,  # skip missing/empty values instead of erroring out
-            )
+            host_vars = self.inventory.get_host(host).get_vars()
+            self._set_composite_vars(self.get_option("compose"), host_vars, host, strict=strict)
+            self._add_host_to_composed_groups(self.get_option("groups"), host_vars, host, strict=strict)
+            self._add_host_to_keyed_groups(self.get_option("keyed_groups"), host_vars, host, strict=False)
 
     def parse(self, inventory, loader, path, cache=True):
         super(InventoryModule, self).parse(inventory, loader, path, cache)
+        self._read_config_data(path)
 
-        config = self._read_config_data(path)
-        token = self.templar.template(config.get("token"))
-        if not token:
-            for env_var in self.TOKEN_ENV_VARS:
-                token = os.getenv(env_var)
-                if token:
-                    break
+        token = self.get_option("token")
+        if token and self.templar.is_template(token):
+            token = self.templar.template(token)
         if not token:
             raise AnsibleParserError(
-                "PidginHost API token must be provided via the inventory 'token' option or "
-                "PIDGINHOST_TOKEN/PIDGINHOST_ACCESS_TOKEN environment variables."
-            )
-        config.update({"token": token})
+                "Set the PidginHost API token with the inventory 'token' option or the "
+                "PIDGINHOST_ACCESS_TOKEN or PIDGINHOST_TOKEN environment variable.")
 
         cache_key = self.get_cache_key(path)
         use_cache = self.get_option("cache") and cache
-        update_cache = self.get_option("cache") and not cache
-
         servers = None
         if use_cache:
             try:
                 servers = self._cache[cache_key]
             except KeyError:
-                update_cache = True
+                pass
         if servers is None:
-            servers = PidginHostCommonInventory(token).get_inventory()
-
-        if update_cache:
-            self._cache[cache_key] = servers
-        self._populate(config, token)
+            servers = self._fetch(token)
+            if self.get_option("cache"):
+                self._cache[cache_key] = servers
+        self._populate(servers)

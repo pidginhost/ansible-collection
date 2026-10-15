@@ -1,33 +1,29 @@
 ---
 # Usage:
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/firewall_action.yml \
-#    -e firewall_action_state=present \
-#    -e firewall_rules_set_name=my-nginx-rules \
-#    -e firewall_server_hostname=my-host.example \
-#    -e firewall_policy_in=ACCEPT \
-#    -e firewall_policy_out=ACCEPT
-- name: Manage firewall policy on a server
+#    -e firewall_server_hostname=web1.example.com \
+#    -e firewall_rules_set_name=web \
+#    -e firewall_policy_in=DROP
+- name: Apply a firewall rules set and policies to a server
   hosts: localhost
   connection: local
   gather_facts: false
 
   vars:
-    firewall_action_state: present          # present|absent
-    firewall_rules_set_name: "default"
-    firewall_server_hostname: "my-host.example"
-    firewall_policy_in: "ACCEPT"
+    firewall_server_hostname: "web1.example.com"
+    firewall_rules_set_name: "web"
+    firewall_policy_in: "DROP"
     firewall_policy_out: "ACCEPT"
 
   tasks:
-    - name: Apply firewall policy
+    - name: Apply firewall settings to the public interface
       pidginhost.cloud.firewall_action:
-        state: "{{ firewall_action_state }}"
-        policy_in: "{{ firewall_policy_in }}"
-        policy_out: "{{ firewall_policy_out }}"
         server_hostname: "{{ firewall_server_hostname }}"
-        rules_set_name: "{{ firewall_rules_set_name }}"
+        rules_set_name: "{{ firewall_rules_set_name | default(omit, true) }}"
+        policy_in: "{{ firewall_policy_in | default(omit, true) }}"
+        policy_out: "{{ firewall_policy_out | default(omit, true) }}"
       register: firewall_action_result
 
-    - name: Show firewall action result
+    - name: Show the public interface
       ansible.builtin.debug:
-        var: firewall_action_result
+        var: firewall_action_result.firewall

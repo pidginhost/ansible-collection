@@ -2,7 +2,6 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
@@ -11,60 +10,53 @@ DOCUMENTATION = r"""
 ---
 module: images_info
 
-short_description: Print Servers images information
+short_description: List server OS images.
 
 version_added: 0.2.0
 
 description:
-  - Print Servers images information.
-  - View images API info documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/v1/v1_cloud_images_list).
+  - List the operating system images available for new servers.
+  - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_images_list).
+
 author:
   - Popescu Andrei Cristian (@shbpty)
 
 extends_documentation_fragment:
   - pidginhost.cloud.pidginhost
-
+  - pidginhost.cloud.pidginhost.info
 """
 
 EXAMPLES = r"""
-- name: Print all images data
+- name: List images
   pidginhost.cloud.images_info:
-    state: present
+  register: result
 """
 
+RETURN = r"""
+images:
+  description:
+    - OS images.
+  returned: success
+  type: list
+  elements: dict
+  sample:
+    - id: 12
+      slug: ubuntu24
+      name: Ubuntu 24.04
+      family_name: Ubuntu
+      is_default: true
+      default_username: ubuntu
+"""
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
 
-
-class ImagesInformation(PidginHostCommonModule):
-    def __init__(self, module):
-        super().__init__(module)
-        if self.state == "present":
-            self.present()
-
-    def present(self):
-        account_info = self.get_images_info(self.SUCCESS_CODE)
-        if account_info:
-            self.module.exit_json(
-                changed=False,
-                msg="Current images information",
-                images=account_info,
-            )
-        self.module.fail_json(
-            changed=False, msg="Current images information not found", images=[]
-        )
+from ..module_utils.common import PidginHostAPI, info_argument_spec
 
 
 def main():
-    argument_spec = PidginHostOptions.argument_spec()
-    module = AnsibleModule(
-        argument_spec=argument_spec,
-        supports_check_mode=True
-    )
-
-    ImagesInformation(module)
+    module = AnsibleModule(argument_spec=info_argument_spec(), supports_check_mode=True)
+    module.exit_json(changed=False, images=PidginHostAPI(module).list("/api/cloud/images/"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

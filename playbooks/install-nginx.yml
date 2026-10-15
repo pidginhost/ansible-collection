@@ -1,7 +1,7 @@
 ---
 # Usage:
 # ansible-playbook -i inventory/pidginhost.yml playbooks/install-nginx.yml \
-#   -e "target_ip=176.0.0.0 target_user=phuser" -vv
+#   -e "target_ip=192.0.2.10 target_user=phuser" -vv
 
 # Play 1: create an ephemeral host with the right connection vars
 - name: Define target host for configuration
@@ -52,7 +52,7 @@
     # Option A: use modules + become_exe 'sudo -n'
     - name: Update apt cache
       ansible.builtin.apt:
-        update_cache: yes
+        update_cache: true
         cache_valid_time: 3600
 
     - name: Install Nginx

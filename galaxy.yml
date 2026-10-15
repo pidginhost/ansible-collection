@@ -2,7 +2,7 @@
 # See https://docs.ansible.com/ansible/latest/dev_guide/collections_galaxy_meta.html
 namespace: pidginhost
 name: cloud
-version: "0.3.0"
+version: "0.4.0"
 readme: README.md
 authors:
   - Popescu Andrei Cristian (@shbpty)
@@ -17,6 +17,12 @@ documentation: https://github.com/pidginhost/ansible-collection/blob/main/README
 homepage: https://github.com/pidginhost/ansible-collection
 issues: https://github.com/pidginhost/ansible-collection/issues
 build_ignore:
+  - .claude
+  - .codex-flow
   - .idea
   - .gitignore
+  - .remember
+  - tmp
+  - tests/output
+  - pidginhost-cloud-*.tar.gz
   - changelogs/.plugin-cache.yaml

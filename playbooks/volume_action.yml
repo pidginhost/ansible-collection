@@ -1,29 +1,18 @@
 ---
 # Usage:
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/volume_action.yml \
-#     -e "volume_action_state=present \
-#         volume_alias=data-volume \
-#         volume_server_hostname=my-host.example"
+#     -e "volume_action_state=present volume_alias=data volume_server_hostname=web1.example.com"
 - name: Manage volume attachment
   hosts: localhost
   connection: local
   gather_facts: false
 
   vars:
-    volume_action_state: present          # present|absent
-    volume_alias: null
+    volume_action_state: present          # present attaches, absent detaches
+    volume_alias: data
     volume_server_hostname: null
 
   tasks:
-    - name: Validate input
-      ansible.builtin.assert:
-        that:
-          - volume_alias is not none
-          - volume_alias | length > 0
-          - volume_server_hostname is not none
-          - volume_server_hostname | length > 0
-        fail_msg: "Set volume_alias and volume_server_hostname to manage the attachment."
-
     - name: Apply volume action
       pidginhost.cloud.volume_action:
         state: "{{ volume_action_state }}"
@@ -31,6 +20,6 @@
         server_hostname: "{{ volume_server_hostname }}"
       register: volume_action_result
 
-    - name: Show volume action result
+    - name: Show volume
       ansible.builtin.debug:
         var: volume_action_result.action

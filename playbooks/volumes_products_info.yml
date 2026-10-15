@@ -6,13 +6,9 @@
   connection: local
   gather_facts: false
 
-  vars:
-    volumes_products_state: present
-
   tasks:
     - name: Query volume products
       pidginhost.cloud.volumes_products_info:
-        state: "{{ volumes_products_state }}"
       register: volumes_products_result
 
     - name: Show volume products

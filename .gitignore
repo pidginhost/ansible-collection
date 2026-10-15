@@ -1,0 +1,4 @@
+/tmp/
+/tests/output/
+/pidginhost-cloud-*.tar.gz
+__pycache__/

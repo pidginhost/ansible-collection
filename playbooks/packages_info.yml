@@ -1,18 +1,18 @@
 ---
 # Usage:
-#   ansible-playbook -i inventory/pidginhost.yml playbooks/packages_info.yml
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/packages_info.yml [-e "packages_generation=gen2"]
 - name: Retrieve available server packages
   hosts: localhost
   connection: local
   gather_facts: false
 
   vars:
-    packages_state: present
+    packages_generation: null
 
   tasks:
     - name: Query package catalogue
       pidginhost.cloud.packages_info:
-        state: "{{ packages_state }}"
+        generation: "{{ packages_generation | default(omit, true) }}"
       register: packages_result
 
     - name: Show packages

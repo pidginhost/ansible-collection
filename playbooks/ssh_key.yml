@@ -1,11 +1,14 @@
 ---
 # Usage:
-#   # Add Key
+#   # Add keys
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/ssh_key.yml \
-#    -e '{"ssh_key_state":"present","ssh_keys_desired":["ssh-ed25519 AAAA... user@example"]}'
-#   # Remove Key
+#    -e '{"ssh_keys":["ssh-ed25519 AAAA... user@example.com"]}'
+#   # Keep only the listed keys
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/ssh_key.yml \
-#    -e '{"ssh_key_state":"absent","ssh_keys_remove":["ssh-ed25519 AAAA... user@example.com]}'
+#    -e '{"ssh_keys":["ssh-ed25519 AAAA... user@example.com"],"ssh_key_delete_others":true}'
+#   # Remove keys
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/ssh_key.yml \
+#    -e '{"ssh_key_state":"absent","ssh_keys":["ssh-ed25519 AAAA... user@example.com"]}'
 - name: Manage SSH public keys
   hosts: localhost
   connection: local
@@ -13,38 +16,19 @@
 
   vars:
     ssh_key_state: present          # present|absent
-    ssh_key_delete_others: false
-    ssh_keys_desired: []
-    ssh_keys_remove: []
+    ssh_key_delete_others: false    # only with present
+    ssh_keys: []
 
   tasks:
-    - name: Ensure desired keys are present individually
+    - name: Manage keys
       pidginhost.cloud.ssh_key:
-        state: present
-        delete_others: false
-        ssh_pub_key: "{{ item }}"
-      loop: "{{ ssh_keys_desired }}"
-      when:
-        - ssh_key_state == 'present'
-        - not ssh_key_delete_others
-        - ssh_keys_desired | length > 0
+        state: "{{ ssh_key_state }}"
+        ssh_pub_keys: "{{ ssh_keys }}"
+        delete_others: "{{ ssh_key_delete_others }}"
+      register: ssh_key_result
+      when: ssh_keys | length > 0
 
-    - name: Synchronize keys, removing any others
-      pidginhost.cloud.ssh_key:
-        state: present
-        delete_others: true
-        ssh_pub_key: "{{ ssh_keys_desired }}"
-      when:
-        - ssh_key_state == 'present'
-        - ssh_key_delete_others
-        - ssh_keys_desired | length > 0
-
-    - name: Remove specific keys
-      pidginhost.cloud.ssh_key:
-        state: absent
-        delete_others: false
-        ssh_pub_key: "{{ item }}"
-      loop: "{{ ssh_keys_remove }}"
-      when:
-        - ssh_key_state == 'absent'
-        - ssh_keys_remove | length > 0
+    - name: Show changes
+      ansible.builtin.debug:
+        msg: "added={{ ssh_key_result.added_keys }} deleted={{ ssh_key_result.deleted_keys }}"
+      when: ssh_key_result is not skipped

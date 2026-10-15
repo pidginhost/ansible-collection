@@ -1,11 +1,8 @@
 ---
 # Usage:
 #   ansible-playbook -i inventory/pidginhost.yml playbooks/volume.yml \
-#     -e "volume_state=present \
-#         volume_alias=data-volume \
-#         volume_hostname=my-host.example \
-#         volume_product=fast-storage \
-#         volume_size_gigabytes=50"
+#     -e "volume_alias=data volume_hostname=web1.example.com volume_product=fast-storage volume_size_gigabytes=50"
+#   ansible-playbook -i inventory/pidginhost.yml playbooks/volume.yml -e "volume_alias=data volume_state=absent"
 - name: Manage volumes
   hosts: localhost
   connection: local
@@ -13,41 +10,23 @@
 
   vars:
     volume_state: present            # present|absent
-    volume_alias: "data-volume"
+    volume_alias: data
     volume_hostname: null
     volume_product: null
     volume_project: null
     volume_size_gigabytes: null
 
   tasks:
-    - name: Validate create input
-      ansible.builtin.assert:
-        that:
-          - volume_hostname is not none
-          - volume_product is not none
-          - volume_size_gigabytes is not none
-        fail_msg: |
-          To create a volume set volume_state="present" and supply volume_hostname, volume_product, and volume_size_gigabytes.
-      when: volume_state == 'present'
-
-    - name: Ensure volume is present
+    - name: Apply volume state
       pidginhost.cloud.volume:
-        state: present
+        state: "{{ volume_state }}"
+        volume_alias: "{{ volume_alias }}"
+        hostname: "{{ volume_hostname | default(omit, true) }}"
+        product: "{{ volume_product | default(omit, true) }}"
         project: "{{ volume_project | default(omit, true) }}"
-        product: "{{ volume_product }}"
-        hostname: "{{ volume_hostname }}"
-        volume_alias: "{{ volume_alias }}"
-        size_gigabytes: "{{ volume_size_gigabytes }}"
-      when: volume_state == 'present'
-      register: volume_present_result
+        size_gigabytes: "{{ volume_size_gigabytes | default(omit, true) }}"
+      register: volume_result
 
-    - name: Show volume create result
+    - name: Show volume
       ansible.builtin.debug:
-        var: volume_present_result.volume
-      when: volume_state == 'present'
-
-    - name: Ensure volume is absent
-      pidginhost.cloud.volume:
-        state: absent
-        volume_alias: "{{ volume_alias }}"
-      when: volume_state == 'absent'
+        var: volume_result.volume
