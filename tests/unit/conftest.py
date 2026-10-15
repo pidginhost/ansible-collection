@@ -14,11 +14,12 @@ import pytest
 
 from ansible.module_utils import basic
 from ansible.module_utils.common.text.converters import to_bytes
-from ansible.plugins.loader import init_plugin_loader
 
-# Plain pytest runs need the collection loader before anything imports ansible_collections;
-# ansible-test units installs it already.
+# Plain pytest runs need the collection loader before anything imports ansible_collections. ansible-test units
+# installs it already, and runs module tests where only module_utils can be imported.
 if not any(type(f).__name__ == "_AnsibleCollectionFinder" for f in sys.meta_path):
+    from ansible.plugins.loader import init_plugin_loader
+
     init_plugin_loader([os.path.abspath(os.path.join(os.path.dirname(__file__), *[os.pardir] * 5))])
 
 try:
