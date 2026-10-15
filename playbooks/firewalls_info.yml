@@ -6,13 +6,9 @@
   connection: local
   gather_facts: false
 
-  vars:
-    firewalls_state: present
-
   tasks:
-    - name: Query firewall data
+    - name: Query firewall rules sets
       pidginhost.cloud.firewalls_info:
-        state: "{{ firewalls_state }}"
       register: firewalls_result
 
     - name: Show firewalls

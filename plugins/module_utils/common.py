@@ -2,496 +2,167 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
 import ipaddress
 import json
-import logging
-from urllib.error import HTTPError, URLError
+import time
+from urllib.parse import urlencode
 
 from ansible.module_utils.basic import env_fallback
 from ansible.module_utils.common.text.converters import to_text
-from ansible.module_utils.urls import fetch_url, open_url
+from ansible.module_utils.urls import fetch_url
 
+BASE_URL = "https://www.pidginhost.com"
+TOKEN_ENV_VARS = ["PIDGINHOST_ACCESS_TOKEN", "PIDGINHOST_TOKEN"]
+POLL_INTERVAL = 5
+SERVERS = "/api/cloud/servers/"
 
-class PidginHostsConstants:
-    BASE_URL = 'https://www.pidginhost.com/'
-    FIREWALL_RULES_SET_ENDPOINT = "api/cloud/firewall-rules-set/"
-    ACCOUNT_PROFILE_ENDPOINT = 'api/account/profile'
-    CLOUD_IMAGE_ENDPOINT = "api/cloud/images/"
-    CLOUD_PACKAGES_ENDPOINT = "api/cloud/server-packages/"
-    CLOUD_SERVERS_ENDPOINT = "api/cloud/servers/"
-    SSH_KEYS_ENDPOINT = "api/account/ssh-keys/"
-    CLOUD_IPV4_ENDPOINT = "api/cloud/ipv4/"
-    POWER_MANAGEMENT = "/power-management/"
-    VOLUMES_ENDPOINT = "api/cloud/volumes/"
-    STORAGE_PRODUCT_ENDPOINT = "api/cloud/storage-products/"
-    IPV4_ENDPOINT = "api/cloud/ipv4/"
-    IPV6_ENDPOINT = "api/cloud/ipv6/"
-    DETACH = "/detach/"
-    ATTACHE = "/attach/"
-    VOLUMES = "/volumes/"
-    RULES = "/rules/"
-    ATTACH_IPV4 = "/attach-ipv4/"
-    ATTACH_IPV6 = "/attach-ipv6/"
-    IPV4 = "ipv4"
-    IPV6 = "ipv6"
-    MODIFY_PACKAGES = "/modify-package/"
-    PUBLIC_INTERFACE = "/public-interface/"
-    PH_DEFAULT_USER = "phuser"
-    SLEEP = 5
-    DPORT_MAX_LENGTH = 500
-    DESTINATION_MAX_LENGTH = 500
-    SPORT_MAX_LENGTH = 500
-    PROTOCOL_MAX_LENGTH = 100
-    SOURCE_MAX_LENGTH = 500
-    VOLUME_ALIAS_MAX_LENGTH = 50
-    HOST_NAME_MAX_LENGTH = 253
-    PROJECT_NAME_MAX_LENGTH = 200
-    PASSWORD_MAX_LENGTH = 50
-    SSH_PUB_KEY_MAX_LENGTH = 3000
-    SSH_PUB_KEY_ID_LENGTH = 100
-    FIREWALL_NAME_MAX_LENGTH = 200
-    SUCCESS_CODE = 200
-    ERROR_CODES = [400, 404, 500]
-    CREATE_SERVER_SUCCESS_CODE = 201
-    DELETE_SUCCESS_CODE = 204
-    ADD_SUCCESS_CODE = 201
-    REQUIRED_MAX_LENGTH_PARAMS = {"hostname": HOST_NAME_MAX_LENGTH,
-                                  "project": PROJECT_NAME_MAX_LENGTH,
-                                  "password": PASSWORD_MAX_LENGTH,
-                                  "ssh_pub_key": SSH_PUB_KEY_MAX_LENGTH,
-                                  "ssh_pub_key_id": SSH_PUB_KEY_ID_LENGTH,
-                                  "alias": VOLUME_ALIAS_MAX_LENGTH,
-                                  "rules_set_name": FIREWALL_NAME_MAX_LENGTH,
-                                  "protocol": PROTOCOL_MAX_LENGTH,
-                                  "source": SOURCE_MAX_LENGTH,
-                                  "sport": SPORT_MAX_LENGTH,
-                                  "destination": DESTINATION_MAX_LENGTH,
-                                  "dport": DPORT_MAX_LENGTH}
 
+def pidginhost_argument_spec(**options):
+    spec = dict(
+        token=dict(type="str", required=True, no_log=True, fallback=(env_fallback, TOKEN_ENV_VARS)),
+        timeout=dict(type="int", default=300),
+    )
+    spec.update(options)
+    return spec
 
-class PidginHostOptions:
-    @staticmethod
-    def argument_spec():
-        return dict(
-            state=dict(
-                type="str",
-                choices=["present", "absent"],
-                default="present",
-            ),
-            timeout=dict(
-                type="int",
-                default=300,  # 5 minutes
-            ),
-            token=dict(
-                type="str",
-                fallback=(
-                    env_fallback,
-                    [
-                        "PIDGINHOST_ACCESS_TOKEN",
-                        "PIDGINHOST_TOKEN",
-                    ],
-                ),
-                no_log=True,
-                required=True,
-            ))
 
+def info_argument_spec(**options):
+    # Info modules accepted a meaningless state option before 0.4.0.
+    return pidginhost_argument_spec(
+        state=dict(type="str", removed_in_version="1.0.0", removed_from_collection="pidginhost.cloud"),
+        **options
+    )
 
-class PidginHostLengthChecker(PidginHostsConstants):
-    def __init__(self, module):
-        self.module = module
 
-    def arguments_max_length(self, **kwargs):
-        max_length_result = {
-            key: len(value) for key, value in kwargs.items()
-            if value and len(value) > self.REQUIRED_MAX_LENGTH_PARAMS.get(key, 0)
-        }
+def drop_none(params):
+    return dict((k, v) for k, v in params.items() if v is not None)
 
-        if max_length_result:
-            max_length_error = dict()
-            for key, value in max_length_result.items():
-                max_length_error[key] = f'Max length for ({key}) is set to ' \
-                                        f'{self.REQUIRED_MAX_LENGTH_PARAMS.get(key, 0)} ' \
-                                        f'but your chosen {key} has a length of {value}'
 
-            if max_length_error:
-                self.module.fail_json(
-                    changed=False,
-                    msg=max_length_error,
-                    server=[]
-                )
-
-    def volume_minim_max(self, **kwargs):
-        product = kwargs.get("product")
-        size_gigabytes = kwargs.get("size_gigabytes")
-
-        min_size = kwargs['products_data'][product]['min_size']
-        max_size = kwargs['products_data'][product]['max_size']
-        if size_gigabytes < min_size or size_gigabytes > max_size:
-            self.module.fail_json(
-                changed=False,
-                msg=f"Storage size {size_gigabytes} for {product} must be between {min_size} and {max_size}."
-            )
-
-
-class PidginHostCommonModule(PidginHostLengthChecker):
-    def __init__(self, module):
-        super().__init__(module)
-        self.module = module
-        self.state = module.params.get("state")
-        self.token = module.params.get("token")
-        self.ssh_pub_key = module.params.get("ssh_pub_key")
-        self.timeout = module.params.get("timeout")
-        self.headers = {
-            'Authorization': f"Token {self.token}",
-            'Accept': 'application/json',
-        }
-
-    def _request(self, method, endpoint, body=None, extra_headers=None):
-        url = f"{self.BASE_URL}{endpoint}"
-        headers = self.headers.copy()
-        if extra_headers:
-            headers.update(extra_headers)
-
-        data = None
-        if body is not None:
-            data = json.dumps(body).encode('utf-8')
-            headers.setdefault('Content-Type', 'application/json')
-
-        resp, info = fetch_url(
-            self.module,
-            url,
-            data=data,
-            headers=headers,
-            method=method,
-            timeout=self.timeout,
-        )
-
-        if info.get('exception'):
-            self.module.fail_json(
-                changed=False,
-                msg=f"HTTP {method} request to {url} failed",
-                error=info['exception'],
-            )
-
-        status = info.get('status')
-        if status is None:
-            self.module.fail_json(
-                changed=False,
-                msg=f"PidginHost API error, missing status for request to {url}",
-                response=info,
-            )
-
-        raw = b''
-        if resp:
-            raw = resp.read()
-        elif info.get('body'):
-            raw = info['body']
-            if isinstance(raw, str):
-                raw = raw.encode('utf-8')
-
-        return status, raw
-
-    def get_ipv6_address_info(self):
-        return self.get_request(self.IPV6_ENDPOINT, self.SUCCESS_CODE)
-
-    def get_ipv4_address_info(self):
-        return self.get_request(self.IPV4_ENDPOINT, self.SUCCESS_CODE)
-
-    def attach_ip_by_id(self, server_id, ip_type, body):
-        if ip_type == self.IPV4:
-            attach = self.ATTACH_IPV4
-        else:
-            attach = self.ATTACH_IPV6
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{attach}"
-        return self.post_request(url, body, self.SUCCESS_CODE)
-
-    def detach_ip_by_id(self, ip_type, ip_id, body):
-
-        if ip_type == self.IPV4:
-            endpoint = self.IPV4_ENDPOINT
-        else:
-            endpoint = self.IPV6_ENDPOINT
-
-        url = f"{endpoint}{ip_id}{self.DETACH}"
-        return self.post_request(url, body, self.SUCCESS_CODE)
-
-    def get_storage_products_info(self):
-        return self.get_request(self.STORAGE_PRODUCT_ENDPOINT, self.SUCCESS_CODE)
-
-    def increase_volume(self, volume_id, body):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}/"
-
-        return self.patch_request(url, body, self.SUCCESS_CODE)
-
-    def delete_volume(self, volume_id):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}/"
-        return self.delete_request(url, self.DELETE_SUCCESS_CODE)
-
-    def add_volume_to_server(self, server_id, body):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.VOLUMES}"
-        return self.post_request(url, body, self.CREATE_SERVER_SUCCESS_CODE)
-
-    def detach_volume_by_id(self, volume_id, body):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}{self.DETACH}"
-        return self.post_request(url, body, self.SUCCESS_CODE)
-
-    def attach_volume_by_id(self, volume_id, body):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}{self.ATTACHE}"
-        return self.post_request(url, body, self.SUCCESS_CODE)
-
-    def get_server_power_management_by_id(self, server_id, api_code):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.POWER_MANAGEMENT}"
-        return self.get_request(url, api_code)
-
-    def get_server_volume_by_id(self, volume_id, server_id, api_code):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.VOLUMES}{volume_id}"
-        return self.get_request(url, api_code)
-
-    def get_volumes_info(self, api_code):
-        return self.get_request(self.VOLUMES_ENDPOINT, api_code)
-
-    def get_volumes_info_server(self, api_code, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.VOLUMES}"
-        return self.get_request(url, api_code)
-
-    def get_volume_by_id(self, volume_id):
-        url = f"{self.VOLUMES_ENDPOINT}{volume_id}/"
-        return self.get_request(url, self.SUCCESS_CODE)
-
-    def get_all_volumes_from_server_by_id(self, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.VOLUMES}"
-        return self.get_request(url, self.SUCCESS_CODE)
-
-    def delete_firewall_rules_set(self, rules_set_id):
-        url = f"{self.FIREWALL_RULES_SET_ENDPOINT}{rules_set_id}"
-        return self.delete_request(url, self.DELETE_SUCCESS_CODE)
-
-    def get_firewalls_info(self, api_code):
-        return self.get_request(self.FIREWALL_RULES_SET_ENDPOINT, api_code)
-
-    def create_firewall_rules_set(self, body):
-        return self.post_request(self.FIREWALL_RULES_SET_ENDPOINT,
-                                 body, self.ADD_SUCCESS_CODE)
-
-    def remove_public_interface(self, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.PUBLIC_INTERFACE}"
-        return self.delete_request(url, self.DELETE_SUCCESS_CODE)
-
-    def add_public_interface(self, body, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.PUBLIC_INTERFACE}"
-        return self.post_request(url, body, self.SUCCESS_CODE)
-
-    def get_public_interface_for_server(self, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.PUBLIC_INTERFACE}"
-        return self.get_request(url, self.SUCCESS_CODE)
-
-    def add_firewall_rules(self, body, rules_set_id):
-        url = f'{self.FIREWALL_RULES_SET_ENDPOINT}{rules_set_id}{self.RULES}'
-        return self.post_request(url, body, self.ADD_SUCCESS_CODE)
-
-    def get_account_info(self, api_code):
-        return self.get_request(self.ACCOUNT_PROFILE_ENDPOINT,
-                                api_code)
-
-    def get_images_info(self, api_code):
-        return self.get_request(self.CLOUD_IMAGE_ENDPOINT,
-                                api_code)
-
-    def modify_package(self, server_id, body):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.MODIFY_PACKAGES}"
-        return self.post_request(url, body, self.SUCCESS_CODE)
-
-    def get_packages_info(self, api_code):
-        return self.get_request(self.CLOUD_PACKAGES_ENDPOINT,
-                                api_code)
-
-    def return_packages_choices(self):
-        packages_choices = list()
-        data = self.get_packages_info(self.SUCCESS_CODE)
-        for item in data.get('results'):
-            packages_choices.append(item['slug'])
-        return packages_choices
-
-    def get_cloud_servers_data(self, api_code):
-        return self.get_request(self.CLOUD_SERVERS_ENDPOINT,
-                                api_code)
-
-    def get_cloud_server_data_by_id(self, server_id, api_code, allow_missing=False):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}/"
-        return self.get_request(url, api_code, allow_missing=allow_missing)
-
-    def get_cloud_server_volumes_by_id(self, server_id, api_code):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.VOLUMES}"
-        return self.get_request(url, api_code)
-
-    def get_cloud_server_action_by_id(self, server_id, api_code):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}{self.POWER_MANAGEMENT}"
-        return self.get_request(url, api_code)
-
-    def get_cloud_server_by_id(self, server_id):
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}/"
-        return self.get_request(url, self.SUCCESS_CODE)
-
-    def get_cloud_server_ipv4(self, api_code):
-        return self.get_request(self.CLOUD_IPV4_ENDPOINT,
-                                api_code)
-
-    def get_request_exist(self, endpoint):
-        status, unused_content = self._request('GET', endpoint)
-        del unused_content
-        return True if self.SUCCESS_CODE == status else None
-
-    def patch_request(self, endpoint, body, api_code):
-        status, content = self._request('PATCH', endpoint, body=body)
-        return self.handle_response(status, content, endpoint, api_code)
-
-    def get_request(self, endpoint, api_code, allow_missing=False):
-        status, content = self._request('GET', endpoint)
-        if allow_missing and status == 404:
-            return None
-        return self.handle_response(status, content, endpoint, api_code)
-
-    def post_request(self, endpoint, body, api_code):
-        payload = {
-            key: value
-            for key, value in body.items()
-            if value is not None and value != ""
-        }
-        status, content = self._request('POST', endpoint, body=payload)
-        return self.handle_response(status, content, endpoint, api_code)
-
-    def delete_request(self, endpoint, api_code):
-        status, content = self._request('DELETE', endpoint)
-        if status == api_code and not content:
-            return True
-        return self.handle_response(status, content, endpoint, api_code)
-
-    def handle_response(self, status, content, endpoint, api_code):
-        url = f"{self.BASE_URL}{endpoint}"
-        if api_code == self.ERROR_CODES:
-            return False if status in self.ERROR_CODES else True
-
-        if status == api_code:
-            if not content:
-                return {}
-            text_content = to_text(content, errors='surrogate_or_strict')
-            try:
-                return json.loads(text_content)
-            except json.JSONDecodeError:
-                return text_content
-
-        self.module.fail_json(
-            changed=False,
-            msg=f"PidginHost API error, request to {url} failed",
-            response=to_text(content, errors='surrogate_or_strict'),
-            status_code=status,
-        )
-
-    def get_ssh_key_by_id(self, ssh_key_id):
-        url = f"{self.SSH_KEYS_ENDPOINT}{ssh_key_id}"
-        return self.get_request(url, self.SUCCESS_CODE)
-
-    def get_ssh_keys(self):
-        """Get available SSH keys from the cloud server."""
-        return self.get_request(self.SSH_KEYS_ENDPOINT,
-                                self.SUCCESS_CODE)
-
-    @staticmethod
-    def check_if_just_one(**kwargs):
-        products = []
-        data = kwargs.get("data")
-        list_name = kwargs.get("list_name")
-        name = kwargs.get("name")
-        check_name = kwargs.get("check_name")
-
-        if data and isinstance(data, dict):
-            if list_name:
-                items = data.get(list_name)
-                products = [product for product in items if product.get(check_name) == name]
-        if data and isinstance(data, list):
-            products = [product for product in data if product[check_name] == name]
-
-        return products
-
-    def check_existing_ssh_pub_keys(self, key):
-        """Check if the SSH public key already exists on the cloud server."""
-        check_keys_data = self.get_ssh_keys()
-        if isinstance(check_keys_data, dict) and check_keys_data:
-            for ph_key in check_keys_data.get("results"):
-                if key == ph_key["key"]:
-                    return ph_key
+def ip_version(address):
+    """Return 4 or 6 for a valid IP address, None otherwise."""
+    try:
+        return ipaddress.ip_address(to_text(address)).version
+    except ValueError:
         return None
 
-    def add_ssh_key(self, body):
-        """Add a new SSH public key to the cloud server."""
-        return self.post_request(self.SSH_KEYS_ENDPOINT,
-                                 body, self.ADD_SUCCESS_CODE)
 
-    def delete_ssh_key(self, ssh_key_id):
-        url = f"{self.SSH_KEYS_ENDPOINT}{ssh_key_id}/"
-        return self.delete_request(url, self.DELETE_SUCCESS_CODE)
-
-    def validate_ip(self, ip_address):
-        try:
-            ipaddress.IPv4Address(ip_address)
-            return self.get_ipv4_address_info(), self.IPV4
-        except ipaddress.AddressValueError:
-            pass
-
-        try:
-            ipaddress.IPv6Address(ip_address)
-            return self.get_ipv6_address_info(), self.IPV6
-        except ipaddress.AddressValueError:
-            pass
-        return None, None
-
-    @staticmethod
-    def return_valid_body_items(body):
-        return {
-            key: value if value else ""
-            for key, value in body.items()
-        }
-
-    def check_if_products_exist(self, p):
-        data = self.get_storage_products_info()
-
-        products_data = {product["slug"]: {"min_size": product["min_size"], "max_size": product["max_size"]}
-                         for product in data.get("results")}
-
-        exists = any(product["slug"] == p for product in data.get("results"))
-
-        if not exists:
-            products = [product["slug"] for product in data.get("results")]
-            self.module.fail_json(
-                changed=False,
-                msg=f"No Product named {p}, available products: {', '.join(products)}",
-                volume=[]
-            )
-        return products_data
+def _decode(raw):
+    if not raw:
+        return None
+    text = to_text(raw, errors="surrogate_or_strict")
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text
 
 
-class PidginHostCommonInventory:
-    def __init__(self, token):
-        self.token = token
+class PidginHostAPI(object):
+    def __init__(self, module):
+        self.module = module
+        self.timeout = module.params["timeout"]
         self.headers = {
-            'Authorization': f"Token {self.token}",
-            'Accept': 'application/json',
+            "Authorization": "Token %s" % module.params["token"],
+            "Accept": "application/json",
         }
-        self.url = f"{PidginHostsConstants.BASE_URL}{PidginHostsConstants.CLOUD_SERVERS_ENDPOINT}"
 
-    def get_inventory(self):
-        try:
-            response = open_url(self.url, headers=self.headers, method='GET', timeout=PidginHostsConstants.SLEEP)
-            data = response.read()
-            if data:
-                payload = json.loads(to_text(data, errors='surrogate_or_strict'))
-                return payload.get("results")
-        except (HTTPError, URLError, ValueError) as exc:
-            logging.warning("Connection Error: %s", exc)
-        except Exception as exc:  # pylint: disable=broad-except
-            logging.warning("Unexpected error fetching inventory: %s", exc)
+    def request(self, method, path, body=None, query=None, allow_404=False):
+        url = BASE_URL + path
+        if query:
+            url += "?" + urlencode(query)
+        headers = dict(self.headers)
+        data = None
+        if body is not None:
+            data = json.dumps(body)
+            headers["Content-Type"] = "application/json"
+
+        resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method, timeout=self.timeout)
+        status = info.get("status", -1)
+        if status == -1:
+            self.module.fail_json(msg="PidginHost API %s %s failed: %s" % (method, path, info.get("msg")))
+        if allow_404 and status == 404:
+            return None
+        if 200 <= status < 300:
+            body = _decode(resp.read() if resp else None)
+            return {} if body is None else body
+        response = _decode(info.get("body"))
+        self.module.fail_json(
+            msg="PidginHost API %s %s returned HTTP %s: %s" % (method, path, status, response or info.get("msg")),
+            status_code=status,
+            response=response,
+        )
+
+    def get(self, path, **kwargs):
+        return self.request("GET", path, **kwargs)
+
+    def post(self, path, body=None, **kwargs):
+        return self.request("POST", path, body={} if body is None else body, **kwargs)
+
+    def patch(self, path, body, **kwargs):
+        return self.request("PATCH", path, body=body, **kwargs)
+
+    def delete(self, path, **kwargs):
+        return self.request("DELETE", path, **kwargs)
+
+    def list(self, path, **query):
+        """Return every item of a list endpoint, following pagination."""
+        data = self.get(path, query=query)
+        if isinstance(data, list):
+            return data
+        items = list(data.get("results", []))
+        page = 1
+        while data.get("next"):
+            page += 1
+            # Page numbers instead of the absolute "next" URL keep the token on BASE_URL.
+            data = self.get(path, query=dict(query, page=page))
+            items.extend(data.get("results", []))
+        return items
+
+    def wait_for(self, fetch, ready):
+        """Poll fetch() until ready(result) holds. Returns the result, or None on timeout."""
+        deadline = time.monotonic() + self.timeout
+        while True:
+            obj = fetch()
+            if ready(obj):
+                return obj
+            if time.monotonic() >= deadline:
+                return None
+            time.sleep(POLL_INTERVAL)
+
+    def find_one(self, items, kind, **match):
+        found = [i for i in items if all(i.get(k) == v for k, v in match.items())]
+        if len(found) > 1:
+            self.module.fail_json(
+                msg="Found %d %s matching %s (ids: %s); use an id instead."
+                    % (len(found), kind, match, ", ".join(str(i.get("id")) for i in found))
+            )
+        return found[0] if found else None
+
+    def find_ip(self, address):
+        """Return (version, owned public IP or None) for an address."""
+        version = ip_version(address)
+        if not version:
+            self.module.fail_json(msg="%s is not a valid IP address." % address)
+        wanted = ipaddress.ip_address(to_text(address))
+        for item in self.list("/api/cloud/ipv%d/" % version):
+            if ipaddress.ip_address(to_text(item["address"])) == wanted:
+                return version, item
+        return version, None
+
+    def find_server(self, server_id=None, hostname=None):
+        """Return the server detail by id or unique hostname, or None if absent."""
+        if not server_id:
+            match = self.find_one(self.list(SERVERS), "servers", hostname=hostname)
+            if not match:
+                return None
+            server_id = match["id"]
+        return self.get("%s%s/" % (SERVERS, server_id), allow_404=True)
+
+    def require_server(self, server_id=None, hostname=None):
+        server = self.find_server(server_id, hostname)
+        if not server:
+            self.module.fail_json(msg="Server %s not found." % (server_id or hostname))
+        return server

@@ -1,18 +1,21 @@
 ---
 # Usage:
-#   ansible-playbook -i inventory/pidginhost.yml playbooks/servers_info.yml
-- name: Retrieve servers summary
+#   ansible-playbook playbooks/servers_info.yml
+#   ansible-playbook playbooks/servers_info.yml -e "servers_hostname=web1.example.com" -e '{"servers_include": ["usage"]}'
+- name: Retrieve servers
   hosts: localhost
   connection: local
   gather_facts: false
 
   vars:
-    servers_state: present
+    servers_hostname: null
+    servers_include: []                   # snapshots, usage, traffic, activity, boot_isos
 
   tasks:
     - name: Query servers
       pidginhost.cloud.servers_info:
-        state: "{{ servers_state }}"
+        server_hostname: "{{ servers_hostname | default(omit, true) }}"
+        include: "{{ servers_include | default(omit, true) }}"
       register: servers_result
 
     - name: Show servers

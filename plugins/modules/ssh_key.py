@@ -2,7 +2,6 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
@@ -11,14 +10,14 @@ DOCUMENTATION = r"""
 ---
 module: ssh_key
 
-short_description: Manage SSH keys.
+short_description: Manage account SSH keys.
 
 version_added: 0.2.0
 
 description:
-  - Add or remove SSH keys for the authenticated account.
-  - View the add SSH key API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_create).
-  - View the delete SSH key API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_destroy).
+  - Add or remove SSH public keys of the account.
+  - Keys are compared on their type and base64 data. The comment is ignored.
+  - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/account/account_ssh_keys_create).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
@@ -27,205 +26,149 @@ extends_documentation_fragment:
   - pidginhost.cloud.pidginhost
 
 options:
+  state:
+    description:
+      - Whether the keys should exist.
+    type: str
+    choices: [present, absent]
+    default: present
   ssh_pub_key:
     description:
-      - SSH public key string or a JSON-encoded list of keys when C(delete_others=true).
+      - One SSH public key.
+      - Exactly one of O(ssh_pub_key) and O(ssh_pub_keys) is required.
     type: str
-    required: true
+  ssh_pub_keys:
+    description:
+      - A list of SSH public keys.
+    type: list
+    elements: str
+  alias:
+    description:
+      - Alias of the keys. Updated on existing keys when it differs.
+      - When not set, a new key takes its comment as alias.
+    type: str
   delete_others:
     description:
-      - When true, keep only the provided keys and delete all others.
+      - Delete every account key that is not listed. Only valid with O(state=present).
     type: bool
-    required: false
     default: false
 """
 
 EXAMPLES = r"""
-- name: Add a single SSH key
+- name: Add a key
   pidginhost.cloud.ssh_key:
-    state: present
-    ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+    ssh_pub_key: "{{ lookup('ansible.builtin.file', '~/.ssh/id_ed25519.pub') }}"
+    alias: laptop
 
-- name: Replace all SSH keys with a provided list
+- name: Keep only these keys in the account
   pidginhost.cloud.ssh_key:
-    state: present
+    ssh_pub_keys:
+      - ssh-ed25519 AAAA... alice@example.com
+      - ssh-ed25519 BBBB... bob@example.com
     delete_others: true
-    ssh_pub_key: "{{ ['ssh-ed25519 AAA...', 'ssh-ed25519 BBB...'] | to_json }}"
 
-- name: Remove a specific SSH key
+- name: Remove a key
   pidginhost.cloud.ssh_key:
     state: absent
-    ssh_pub_key: "ssh-ed25519 AAA..."
+    ssh_pub_key: ssh-ed25519 AAAA... alice@example.com
 """
 
+RETURN = r"""
+added_keys:
+  description:
+    - Keys that were added.
+  returned: success
+  type: list
+  elements: str
+  sample: ["ssh-ed25519 AAAA... alice@example.com"]
+deleted_keys:
+  description:
+    - Keys that were deleted, as stored in the account.
+  returned: success
+  type: list
+  elements: str
+  sample: ["ssh-ed25519 BBBB... bob@example.com"]
+ssh_key:
+  description:
+    - The account key when exactly one key is given. After deletion, the key before deletion.
+    - Empty when more keys are given, or when O(state=absent) and the key did not exist.
+  returned: success
+  type: dict
+  sample:
+    id: 7
+    alias: laptop
+    fingerprint: "SHA256:..."
+    key: ssh-ed25519 AAAA... alice@example.com
+"""
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
-import ast
+
+from ..module_utils.common import PidginHostAPI, drop_none, pidginhost_argument_spec
+
+SSH_KEYS = "/api/account/ssh-keys/"
 
 
-class HandleSSHKeys(PidginHostCommonModule):
-    def __init__(self, module):
-        super().__init__(module)
-        self.token = module.params.get("token")
-        self.ssh_pub_key = module.params.get("ssh_pub_key")
-        self.delete_others = module.params.get("delete_others")
-        if self.delete_others:
-            self.ssh_pub_key = ast.literal_eval(self.ssh_pub_key)
-        self.delete_others = module.params.get("delete_others")
-
-        self.arguments_max_length(ssh_pub_key=self.ssh_pub_key)
-
-        if self.state == "present":
-            self.present()
-        if self.state == "absent":
-            self.absent()
-
-    def present(self):
-        if self.delete_others:
-            body = {
-                "key": "",
-                "token": self.token
-            }
-            added_keys = list()
-            check_keys_data = self.get_ssh_keys()
-            cloud_ssh_keys = check_keys_data.get("results")
-
-            diff_ssh_keys = [key["key"] for key in cloud_ssh_keys if
-                             key["key"] not in self.ssh_pub_key]
-
-            if self.module.check_mode:
-                for k in self.ssh_pub_key:
-                    if not self.check_existing_ssh_pub_keys(k):
-                        added_keys.append(k)
-
-                self.module.exit_json(
-                    changed=True,
-                    deleted_msg="Keys will be deleted from Cloud.",
-                    deleted_keys=diff_ssh_keys,
-                    msg="Keys will be added to Cloud.",
-                    added_keys=added_keys,
-                    ssh_key=[],
-                )
-            else:
-                for key in self.ssh_pub_key:
-                    if not self.check_existing_ssh_pub_keys(key):
-                        added_keys.append(key)
-                        body["key"] = key
-                        self.add_ssh_key(body)
-                if diff_ssh_keys:
-                    for key in diff_ssh_keys:
-                        ssh_pub_key_exist = self.check_existing_ssh_pub_keys(key)
-                        if ssh_pub_key_exist:
-                            self.delete_ssh_key(ssh_pub_key_exist["id"])
-
-                self.module.exit_json(
-                    changed=True,
-                    deleted_msg="Keys have been deleted from Cloud.",
-                    deleted_keys=diff_ssh_keys,
-                    msg="Keys have been added to Cloud.",
-                    added_keys=added_keys,
-                    ssh_key=[],
-                )
-
-        else:
-            body = {
-                "key": self.ssh_pub_key,
-                "token": self.token
-            }
-            if self.check_existing_ssh_pub_keys(self.ssh_pub_key):
-                self.module.fail_json(
-                    changed=False,
-                    deleted_msg=[],
-                    deleted_keys=[],
-                    msg=f"SSH Pub Key {self.ssh_pub_key} already exists on cloud",
-                    added_keys=[],
-                    ssh_key=[],
-                )
-            else:
-                if self.module.check_mode:
-                    self.module.exit_json(
-                        changed=True,
-                        deleted_msg=[],
-                        deleted_keys=[],
-                        msg="SSH Pub Key will be added to cloud",
-                        added_keys=[],
-                        ssh_key=[],
-                    )
-                else:
-                    self.add_ssh_key(body)
-                    self.module.exit_json(
-                        changed=True,
-                        deleted_msg=[],
-                        deleted_keys=[],
-                        msg="SSH Pub Key successfully added to cloud",
-                        added_keys=[],
-                        ssh_key=[],
-
-                    )
-
-    def absent(self):
-        if self.delete_others:
-            self.module.exit_json(
-                changed=False,
-                deleted_msg=[],
-                deleted_keys=[],
-                msg="You need to choose state=present when delete_others=true",
-                added_keys=[],
-                ssh_key=[],
-            )
-        else:
-            ssh_pub_key_exist = self.check_existing_ssh_pub_keys(self.ssh_pub_key)
-            if not ssh_pub_key_exist:
-                self.module.exit_json(
-                    changed=False,
-                    deleted_msg=[],
-                    deleted_keys=[],
-                    msg=f"SSH key {self.ssh_pub_key} does not exist",
-                    added_keys=[],
-                    ssh_key=[],
-                )
-            elif ssh_pub_key_exist:
-                if self.module.check_mode:
-                    self.module.exit_json(
-                        changed=True,
-                        deleted_msg=[],
-                        deleted_keys=[],
-                        msg=(
-                            f"SSH key {self.ssh_pub_key} fingerprint : ({ssh_pub_key_exist['fingerprint']}) "
-                            "would be deleted"
-                        ),
-                        added_keys=[],
-                        ssh_key=ssh_pub_key_exist,
-                    )
-                else:
-                    self.delete_ssh_key(ssh_pub_key_exist['id'])
-                    self.module.exit_json(
-                        changed=True,
-                        deleted_msg=[],
-                        deleted_keys=[],
-                        msg=(
-                            f"SSH key {self.ssh_pub_key} fingerprint : ({ssh_pub_key_exist['fingerprint']}) "
-                            "is deleted"
-                        ),
-                        added_keys=[],
-                        ssh_key=ssh_pub_key_exist)
+def key_id(key):
+    return " ".join(key.split()[:2])
 
 
 def main():
-    argument_spec = PidginHostOptions.argument_spec()
-    argument_spec.update(
-        ssh_pub_key=dict(type='str', required=True),
-        delete_others=dict(type='bool', default=False, required=False),
-    )
-
     module = AnsibleModule(
-        argument_spec=argument_spec,
+        argument_spec=pidginhost_argument_spec(
+            state=dict(type="str", choices=["present", "absent"], default="present"),
+            ssh_pub_key=dict(type="str", no_log=False),
+            ssh_pub_keys=dict(type="list", elements="str", no_log=False),
+            alias=dict(type="str"),
+            delete_others=dict(type="bool", default=False),
+        ),
+        mutually_exclusive=[("ssh_pub_key", "ssh_pub_keys")],
+        required_one_of=[("ssh_pub_key", "ssh_pub_keys")],
         supports_check_mode=True,
     )
+    params = module.params
+    present = params["state"] == "present"
+    if params["delete_others"] and not present:
+        module.fail_json(msg="delete_others requires state=present.")
 
-    HandleSSHKeys(module)
+    alias = params["alias"]
+    wanted = params["ssh_pub_keys"] if params["ssh_pub_keys"] is not None else [params["ssh_pub_key"]]
+    api = PidginHostAPI(module)
+    stored = dict((key_id(k["key"]), k) for k in api.list(SSH_KEYS))
+    seen, added, renamed, deleted, result = set(), [], [], [], {}
+    for key in wanted:
+        if key_id(key) in seen:
+            continue
+        seen.add(key_id(key))
+        current = stored.get(key_id(key))
+        if current is None:
+            if present:
+                added.append(key)
+                result = drop_none({"key": key, "alias": alias})
+        elif not present:
+            deleted.append(current)
+            result = current
+        elif alias is not None and current.get("alias") != alias:
+            renamed.append(current)
+            result = dict(current, alias=alias)
+        else:
+            result = current
+    if params["delete_others"]:
+        deleted = [k for k in stored.values() if key_id(k["key"]) not in seen]
+
+    if not module.check_mode:
+        for key in added:
+            result = api.post(SSH_KEYS, drop_none({"key": key, "alias": alias}))
+        for key in renamed:
+            result = api.patch("%s%s/" % (SSH_KEYS, key["id"]), {"alias": alias})
+        for key in deleted:
+            api.delete("%s%s/" % (SSH_KEYS, key["id"]))
+    module.exit_json(
+        changed=bool(added or renamed or deleted),
+        added_keys=added,
+        deleted_keys=[k["key"] for k in deleted],
+        ssh_key=result if len(seen) == 1 else {},
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -2,7 +2,6 @@
 # Copyright: (c) 2024, Popescu Andrei Cristian <andrei.popescu.c@gmail.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
@@ -11,15 +10,16 @@ DOCUMENTATION = r"""
 ---
 module: server
 
-short_description: Create or delete servers.
+short_description: Create, update or delete cloud servers.
 
 version_added: 0.2.0
 
 description:
-  - Create or delete servers.
-  - View the create API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_create).
-  - View the delete API documentation at U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_destroy).
-  - Run packages_info module to inspect available packages.
+  - Create, update or delete PidginHost cloud servers.
+  - The server is identified by O(server_id) or by its unique O(hostname).
+  - An existing server is updated in place for O(project) and O(destroy_protection). Other creation options only apply
+    when the server is created.
+  - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_servers_create).
 
 author:
   - Popescu Andrei Cristian (@shbpty)
@@ -28,433 +28,296 @@ extends_documentation_fragment:
   - pidginhost.cloud.pidginhost
 
 options:
-  unique_hostname:
+  state:
     description:
-      - Ensure the hostname is unique when creating or deleting by name.
-    type: bool
-    required: false
-    default: false
+      - Whether the server should exist.
+    type: str
+    choices: [present, absent]
+    default: present
   server_id:
     description:
-      - Identifier of the server to delete when C(unique_hostname=false).
-    type: str
-    required: false
-  image:
-    description:
-      - Image identifier or slug.
-      - Required when C(state=present).
-    type: str
-    required: false
-  package:
-    description:
-      - Package identifier or slug.
-      - Required when C(state=present).
-    type: str
-    required: false
+      - ID of an existing server.
+    type: int
   hostname:
     description:
-      - Hostname to assign to the server.
+      - Server hostname. Used to find the server when O(server_id) is not set, so it must be unique in the account.
     type: str
-    required: false
+  image:
+    description:
+      - Image ID or slug. Required to create a server. See M(pidginhost.cloud.images_info).
+    type: str
+  package:
+    description:
+      - Package ID or slug. Required to create a server. See M(pidginhost.cloud.packages_info).
+      - Use M(pidginhost.cloud.server_action_resize) to change the package of an existing server.
+    type: str
+  generation:
+    description:
+      - Hardware generation slug. See M(pidginhost.cloud.generations_info).
+    type: str
   project:
     description:
-      - Project name to associate with the server.
+      - Project name.
     type: str
-    required: false
   password:
     description:
-      - Password used for server authentication.
+      - Password for the default user. Only used on creation.
     type: str
-    required: false
   ssh_pub_key:
     description:
-      - SSH public key string used for access.
+      - New SSH public key to install. Only used on creation.
     type: str
-    required: false
   ssh_pub_key_id:
     description:
-      - Identifier or fingerprint of an existing SSH key in the account.
+      - ID or fingerprint of an SSH key already in the account. Only used on creation.
     type: str
-    required: false
+  user_data:
+    description:
+      - Startup script run on first boot. Must start with a shebang. Stored in cleartext.
+    type: str
   public_ip:
     description:
-      - Existing public IPv4 address to attach to the server.
+      - ID or address of an IPv4 address you own to attach on creation.
     type: str
-    required: false
   new_ipv4:
     description:
-      - Request allocation of a new public IPv4 address.
+      - Allocate a new IPv4 address on creation.
     type: bool
-    required: false
   public_ipv6:
     description:
-      - Existing public IPv6 address to attach to the server.
+      - ID or address of an IPv6 address you own to attach on creation.
     type: str
-    required: false
   new_ipv6:
     description:
-      - Request allocation of a new public IPv6 address.
+      - Allocate a new IPv6 address on creation.
     type: bool
-    required: false
-  fw_rules_set:
-    description:
-      - Firewall rule set slug or identifier to apply.
-    type: str
-    required: false
-  fw_policy_in:
-    description:
-      - Firewall policy for incoming traffic.
-    type: str
-    required: false
-  fw_policy_out:
-    description:
-      - Firewall policy for outgoing traffic.
-    type: str
-    required: false
-  private_network:
-    description:
-      - Private network identifier or slug.
-    type: str
-    required: false
-  private_address:
-    description:
-      - Private IPv4 address to assign when attaching to a private network.
-    type: str
-    required: false
-  extra_volume_product:
-    description:
-      - Additional volume product slug to provision alongside the server.
-    type: str
-    required: false
-  extra_volume_size:
-    description:
-      - Size in GiB of the additional volume.
-    type: str
-    required: false
   no_network_acknowledged:
     description:
-      - Acknowledges creation without a public network when required by the API.
+      - Confirm creating a server without a public IP address.
+    type: bool
+  fw_rules_set:
+    description:
+      - Firewall rules set ID or name to apply on creation.
     type: str
-    required: false
+  fw_policy_in:
+    description:
+      - Default policy for incoming traffic on creation.
+    type: str
+    choices: [ACCEPT, DROP, REJECT]
+  fw_policy_out:
+    description:
+      - Default policy for outgoing traffic on creation.
+    type: str
+    choices: [ACCEPT, DROP, REJECT]
+  private_network:
+    description:
+      - Private network ID or CIDR to join on creation.
+    type: str
+  private_address:
+    description:
+      - IPv4 address in O(private_network). Assigned automatically when not set.
+    type: str
+  extra_volume_product:
+    description:
+      - Storage product ID or slug for an extra volume created with the server.
+    type: str
+  extra_volume_size:
+    description:
+      - Size in GB of the extra volume.
+    type: int
+  enable_ha:
+    description:
+      - Enable high availability (automatic restart and migration on host failure). Only used on creation.
+    type: bool
+  destroy_protection:
+    description:
+      - Protect the server from deletion.
+      - With O(state=absent), V(false) turns protection off before deleting the server.
+    type: bool
+  wait:
+    description:
+      - Wait until the server is active after creation, or gone after deletion.
+    type: bool
+    default: true
+  unique_hostname:
+    description:
+      - Ignored. The hostname is always used as the server identity when O(server_id) is not set.
+    type: bool
 """
 
 EXAMPLES = r"""
-- name: Create Server
+- name: Create a server
   pidginhost.cloud.server:
-    state: present
-    unique_hostname: true
-    image: string
-    package: string
-    hostname: string
-    project: string
-    password: string
-    ssh_pub_key: string
-    ssh_pub_key_id: string
+    hostname: web1.example.com
+    image: ubuntu24
+    package: cloudv-2
+    ssh_pub_key_id: "123"
     new_ipv4: true
-    new_ipv6: true
-    public_ip: string
-    public_ipv6: string
-    fw_rules_set: string
-    fw_policy_in: ACCEPT
-    fw_policy_out: ACCEPT
-    private_network: string
-    private_address: 198.51.100.42
-    extra_volume_product: string
-    extra_volume_size: 0
-    no_network_acknowledged: true
+    destroy_protection: true
+  register: web1
 
-- name: Delete Server by server hostname
+- name: Delete a server by hostname, turning protection off first
   pidginhost.cloud.server:
     state: absent
-    unique_hostname: true
-    hostname: string
+    hostname: web1.example.com
+    destroy_protection: false
 
-- name: Delete Server by server id
+- name: Delete a server by id
   pidginhost.cloud.server:
     state: absent
-    server_id: "12345"
+    server_id: 12345
 """
 
+RETURN = r"""
+server:
+  description:
+    - Server details. After deletion, the details before deletion.
+    - With O(wait=false), only the ID of a newly created server.
+  returned: success
+  type: dict
+  sample:
+    id: 12345
+    hostname: web1.example.com
+    status: active
+    package: cloudv-2
+    image: ubuntu24
+    destroy_protection: true
+    networks:
+      public:
+        ipv4: 192.0.2.10
+        ipv6: 2001:db8::10
+      private: []
+"""
 
-import time
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.common import PidginHostCommonModule, PidginHostOptions
+
+from ..module_utils.common import SERVERS, PidginHostAPI, drop_none, pidginhost_argument_spec
+
+CREATE_FIELDS = (
+    "hostname", "image", "package", "generation", "project", "password", "ssh_pub_key", "ssh_pub_key_id",
+    "user_data", "public_ip", "new_ipv4", "public_ipv6", "new_ipv6", "no_network_acknowledged", "fw_rules_set",
+    "fw_policy_in", "fw_policy_out", "private_network", "private_address", "extra_volume_product",
+    "extra_volume_size", "enable_ha",
+)
 
 
-class PidginHostCloud(PidginHostCommonModule):
-    def __init__(self, module):
-        super().__init__(module)
-        self.server_id = module.params.get('server_id')
-        self.token = module.params.get("token")
-        self.unique_hostname = module.params.get("unique_hostname")
-        self.image = module.params.get("image")
-        self.package = module.params.get("package")
-        self.hostname = module.params.get("hostname")
-        self.project = module.params.get("project")
-        self.password = module.params.get("password")
-        self.ssh_pub_key = module.params.get("ssh_pub_key")
-        self.ssh_pub_key_id = module.params.get("ssh_pub_key_id")
-        self.public_ip = module.params.get("public_ip")
-        self.new_ipv4 = module.params.get("new_ipv4")
-        self.public_ipv6 = module.params.get("public_ipv6")
-        self.new_ipv6 = module.params.get("new_ipv6")
-        self.fw_rules_set = module.params.get("fw_rules_set")
-        self.fw_policy_in = module.params.get("fw_policy_in")
-        self.fw_policy_out = module.params.get("fw_policy_out")
-        self.private_network = module.params.get("private_network")
-        self.private_address = module.params.get("private_address")
-        self.extra_volume_product = module.params.get("extra_volume_product")
-        self.extra_volume_size = module.params.get("extra_volume_size")
-        self.no_network_acknowledged = module.params.get("no_network_acknowledged")
-        self.timeout = module.params.get("timeout")
+def server_path(server_id, suffix=""):
+    return "%s%s/%s" % (SERVERS, server_id, suffix)
 
-        if self.state == "present" and not any([self.password, self.ssh_pub_key, self.ssh_pub_key_id]):
-            self.module.fail_json(
-                changed=False,
-                msg=(
-                    "At least one of 'password', 'ssh_pub_key', or 'ssh_pub_key_id' must be provided."
-                ),
-                server=[],
-            )
-        # Dynamic max length checker
-        self.arguments_max_length(hostname=self.hostname, project=self.project,
-                                  password=self.password, ssh_pub_key=self.ssh_pub_key,
-                                  ssh_pub_key_id=self.ssh_pub_key_id)
 
-        if self.state == "present":
-            # Dynamic package choices checker
-            package_choices = self.return_packages_choices()
-            if self.package not in package_choices:
-                self.module.fail_json(
-                    changed=False,
-                    msg=f"Package you have chosen is {self.package} value of package must be one of: {package_choices}",
-                    server=[],
-                )
-            self.present()
-        elif self.state == "absent":
-            self.absent()
+def set_destroy_protection(api, server_id, enabled):
+    api.post(server_path(server_id, "destroy-protection/"), {"destroy_protection": enabled})
 
-    def present(self):
-        data = self.get_cloud_servers_data(self.SUCCESS_CODE)
-        servers = self.check_if_just_one(data=data, name=self.hostname, check_name="hostname", list_name="results")
-        if self.unique_hostname:
-            if len(servers) == 0:
-                if self.module.check_mode:
-                    self.module.exit_json(
-                        changed=True,
-                        msg=f"Cloud server with hostname ({self.hostname}) would be created",
-                        server=[],
-                    )
-                else:
-                    self.create_cloud_server()
 
-            elif len(servers) == 1:
-                self.module.fail_json(
-                    changed=False,
-                    msg=f"Cloud server with hostname ({self.hostname}) id ({servers[0]['id']}) exists",
-                    server=servers[0],
-                )
-            elif len(servers) > 1:
-                servers_ids = ", ".join([str(server["id"]) for server in servers])
-                self.module.fail_json(
-                    changed=False,
-                    msg=f"There are currently ({len(servers)}) Servers hostname named "
-                        f"({self.hostname}) : ({servers_ids})",
-                    server=[],
-                )
-        if self.module.check_mode:
-            self.module.exit_json(
-                changed=True,
-                msg=f"Cloud server with hostname ({self.hostname}) would be created",
-                server=[],
-            )
-        else:
-            self.create_cloud_server()
+def create(api, module):
+    params = module.params
+    missing = [name for name in ("image", "package") if not params[name]]
+    if missing:
+        module.fail_json(msg="Creating a server requires: %s" % ", ".join(missing))
+    if module.check_mode:
+        module.exit_json(changed=True, server={})
 
-    def absent(self):
-        data = self.get_cloud_servers_data(self.SUCCESS_CODE)
-        servers = self.check_if_just_one(data=data, name=self.hostname, check_name="hostname", list_name="results")
-        if self.unique_hostname:
-            if len(servers) == 0:
-                if self.module.check_mode:
-                    self.module.exit_json(
-                        changed=False,
-                        msg=f"Cloud server {self.hostname} not found",
-                        server=[],
-                    )
-                else:
-                    self.module.exit_json(
-                        changed=False,
-                        msg=f"Cloud server {self.hostname} not found",
-                        server=[],
-                    )
-            elif len(servers) == 1:
-                if self.module.check_mode:
-                    self.module.exit_json(
-                        changed=True,
-                        msg=f"Cloud server {self.hostname} ({servers[0]['id']}) would be deleted",
-                        server=servers[0],
-                    )
-                else:
-                    self.delete_cloud_server(servers[0])
-            elif len(servers) > 1:
-                servers_ids = ", ".join([str(server["id"]) for server in servers])
-                self.module.fail_json(
-                    changed=False,
-                    msg=f"There are currently {len(servers)} Cloud Servers named {self.hostname} : {servers_ids}",
-                    server=[],
-                )
+    server_id = api.post(SERVERS, drop_none(dict((k, params[k]) for k in CREATE_FIELDS)))["id"]
+    if not params["wait"]:
+        module.exit_json(changed=True, server={"id": server_id})
 
-            return
-
-        if not self.server_id:
-            self.module.fail_json(
-                changed=False,
-                msg="Must provide server_id when deleting Cloud Server without unique_hostname",
-                server=[],
-            )
-
-        server = self.get_cloud_server_data_by_id(self.server_id, self.SUCCESS_CODE, allow_missing=True)
-        if not server:
-            self.module.exit_json(
-                changed=False,
-                msg=f"Cloud Server with ID {self.server_id} not found",
-                server=[],
-            )
-        if self.module.check_mode:
-            self.module.exit_json(
-                changed=True,
-                msg=f"Cloud Server with ID {self.server_id} would be deleted",
-                server=server,
-            )
-        else:
-            self.delete_cloud_server(server)
-
-    def create_cloud_server(self):
-        body = {
-            "image": self.image,
-            "package": self.package,
-            "hostname": self.hostname,
-            "project": self.project,
-            "password": self.password,
-            "ssh_pub_key": self.ssh_pub_key,
-            "ssh_pub_key_id": self.ssh_pub_key_id,
-            "public_ip": self.public_ip,
-            "new_ipv4": self.new_ipv4,
-            "public_ipv6": self.public_ipv6,
-            "new_ipv6": self.new_ipv6,
-            "fw_rules_set": self.fw_rules_set,
-            "fw_policy_in": self.fw_policy_in,
-            "fw_policy_out": self.fw_policy_out,
-            "private_network": self.private_network,
-            "private_address": self.private_address,
-            "extra_volume_product": self.extra_volume_product,
-            "extra_volume_size": self.extra_volume_size,
-            "no_network_acknowledged": self.no_network_acknowledged
-        }
-        server = self.post_request(self.CLOUD_SERVERS_ENDPOINT, body, self.CREATE_SERVER_SUCCESS_CODE)
-        if server:
-            cloud_server = self.check_if_machine_exist(server)
-
-            if not cloud_server:
-                self.module.fail_json(
-                    changed=True,
-                    msg=(
-                        f"Timed out waiting for cloud server id {server['id']} to become ready"
-                    ),
-                    server=server,
-                )
-
-            machine = cloud_server.get("machine", [])
-            if machine["status"] != "running":
-                self.module.fail_json(
-                    changed=True,
-                    msg=(
-                        f"Created Cloud {cloud_server['hostname']} "
-                        f"({cloud_server['id']}) is not 'active', it is '{machine['status']}'"
-                    ),
-                    server=server,
-                )
-            server = self.get_cloud_server_by_id(server['id'])
-            self.module.exit_json(
-                changed=True,
-                msg=(
-                    f"You successfully create a new cloud server with hostname {cloud_server['hostname']} "
-                    f"and id : {cloud_server['id']}"
-                ),
-                server=server,
-            )
-
-    def delete_cloud_server(self, server_data):
-        server_id = server_data["id"]
-        server_hostname = server_data["hostname"]
-        url = f"{self.CLOUD_SERVERS_ENDPOINT}{server_id}/"
-        self.delete_request(url, self.DELETE_SUCCESS_CODE)
-
-        server_still_exists = self.get_cloud_server_data_by_id(server_id, self.ERROR_CODES)
-        end_time = time.monotonic() + self.timeout
-        while time.monotonic() < end_time and server_still_exists:
-            time.sleep(self.SLEEP)
-            server_still_exists = self.get_cloud_server_data_by_id(server_id,
-                                                                   self.ERROR_CODES)
-        if server_still_exists:
-            self.module.fail_json(
-                changed=False,
-                msg=f"Deleting Cloud Server {server_hostname} ({server_id}) has failed",
-                server=server_data,
-            )
-        self.module.exit_json(
+    # New servers return 404 while pending, then move through provisioning to active or failed.
+    server = api.wait_for(
+        lambda: api.get(server_path(server_id), allow_404=True),
+        lambda s: s is not None and s["status"] in ("active", "failed"),
+    )
+    if not server or server["status"] != "active":
+        module.fail_json(
             changed=True,
-            msg=f"Deleted Cloud Server {server_hostname} ({server_id}) has succeeded",
-            server=server_data,
+            msg="Server %s %s." % (server_id, "failed to provision" if server else "did not become active in time"),
+            server=server or {"id": server_id},
         )
+    if params["destroy_protection"]:
+        set_destroy_protection(api, server_id, True)
+        server["destroy_protection"] = True
+    module.exit_json(changed=True, server=server)
 
-    def check_if_machine_exist(self, server):
-        end_time = time.monotonic() + self.timeout
-        while time.monotonic() < end_time:
-            time.sleep(self.SLEEP)
-            cloud_server = self.get_cloud_server_data_by_id(server["id"], self.SUCCESS_CODE)
-            if cloud_server.get("machine")["status"] == "running":
-                return cloud_server
-        return None
+
+def update(api, module, server):
+    params = module.params
+    project_changed = params["project"] is not None and params["project"] != server.get("project")
+    protection_changed = (
+        params["destroy_protection"] is not None and params["destroy_protection"] != server["destroy_protection"]
+    )
+    if not (project_changed or protection_changed):
+        module.exit_json(changed=False, server=server)
+    if module.check_mode:
+        module.exit_json(changed=True, server=server)
+
+    if project_changed:
+        api.patch(server_path(server["id"]), {"project": params["project"]})
+    if protection_changed:
+        set_destroy_protection(api, server["id"], params["destroy_protection"])
+    module.exit_json(changed=True, server=api.get(server_path(server["id"])))
+
+
+def delete(api, module, server):
+    if module.check_mode:
+        module.exit_json(changed=True, server=server)
+    if server["destroy_protection"] and module.params["destroy_protection"] is False:
+        set_destroy_protection(api, server["id"], False)
+    api.delete(server_path(server["id"]))
+    if module.params["wait"]:
+        gone = api.wait_for(lambda: api.get(server_path(server["id"]), allow_404=True) is None, bool)
+        if not gone:
+            module.fail_json(changed=True, msg="Server %s was not deleted in time." % server["id"], server=server)
+    module.exit_json(changed=True, server=server)
 
 
 def main():
-    argument_spec = PidginHostOptions.argument_spec()
-    argument_spec.update(
-        ssh_pub_key=dict(type='str', required=False),
-        unique_hostname=dict(type="bool", default=False, required=False),
-        server_id=dict(type='str', required=False),
-        image=dict(type='str', required=False),
-        package=dict(type='str', required=False),
-        hostname=dict(type='str', required=False),
-        project=dict(type='str', required=False),
-        password=dict(type='str', required=False, no_log=True),
-        ssh_pub_key_id=dict(type='str', required=False, no_log=True),
-        public_ip=dict(type='str', required=False),
-        new_ipv4=dict(type="bool", required=False),
-        public_ipv6=dict(type='str', required=False),
-        new_ipv6=dict(type="bool", required=False),
-        fw_rules_set=dict(type='str', required=False),
-        fw_policy_in=dict(type='str', required=False),
-        fw_policy_out=dict(type='str', required=False),
-        private_network=dict(type='str', required=False),
-        private_address=dict(type='str', required=False),
-        extra_volume_product=dict(type='str', required=False),
-        extra_volume_size=dict(type='str', required=False),
-        no_network_acknowledged=dict(type='str', required=False),
-    )
-
     module = AnsibleModule(
-        argument_spec=argument_spec,
+        argument_spec=pidginhost_argument_spec(
+            state=dict(type="str", choices=["present", "absent"], default="present"),
+            server_id=dict(type="int"),
+            hostname=dict(type="str"),
+            image=dict(type="str"),
+            package=dict(type="str"),
+            generation=dict(type="str"),
+            project=dict(type="str"),
+            password=dict(type="str", no_log=True),
+            ssh_pub_key=dict(type="str", no_log=False),
+            ssh_pub_key_id=dict(type="str", no_log=False),
+            user_data=dict(type="str"),
+            public_ip=dict(type="str"),
+            new_ipv4=dict(type="bool"),
+            public_ipv6=dict(type="str"),
+            new_ipv6=dict(type="bool"),
+            no_network_acknowledged=dict(type="bool"),
+            fw_rules_set=dict(type="str"),
+            fw_policy_in=dict(type="str", choices=["ACCEPT", "DROP", "REJECT"]),
+            fw_policy_out=dict(type="str", choices=["ACCEPT", "DROP", "REJECT"]),
+            private_network=dict(type="str"),
+            private_address=dict(type="str"),
+            extra_volume_product=dict(type="str"),
+            extra_volume_size=dict(type="int"),
+            enable_ha=dict(type="bool"),
+            destroy_protection=dict(type="bool"),
+            wait=dict(type="bool", default=True),
+            unique_hostname=dict(
+                type="bool", removed_in_version="1.0.0", removed_from_collection="pidginhost.cloud"),
+        ),
+        required_one_of=[("server_id", "hostname")],
         supports_check_mode=True,
-        required_if=[
-            ("state", "present", ["image"]),
-            ("state", "present", ["package"]),
-        ]
     )
-    PidginHostCloud(module)
+    api = PidginHostAPI(module)
+    server = api.find_server(module.params["server_id"], module.params["hostname"])
+
+    if module.params["state"] == "absent":
+        if not server:
+            module.exit_json(changed=False, server={})
+        delete(api, module, server)
+    elif server:
+        update(api, module, server)
+    elif module.params["server_id"]:
+        module.fail_json(msg="Server %s not found." % module.params["server_id"])
+    else:
+        create(api, module)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

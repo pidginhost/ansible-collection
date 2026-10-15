@@ -6,13 +6,9 @@
   connection: local
   gather_facts: false
 
-  vars:
-    profile_state: present
-
   tasks:
     - name: Query account profile
       pidginhost.cloud.profile_info:
-        state: "{{ profile_state }}"
       register: profile_result
 
     - name: Show account profile

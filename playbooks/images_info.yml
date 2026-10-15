@@ -6,13 +6,9 @@
   connection: local
   gather_facts: false
 
-  vars:
-    images_state: present
-
   tasks:
     - name: Query image catalogue
       pidginhost.cloud.images_info:
-        state: "{{ images_state }}"
       register: images_result
 
     - name: Show images

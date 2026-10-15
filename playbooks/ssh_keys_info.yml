@@ -6,13 +6,9 @@
   connection: local
   gather_facts: false
 
-  vars:
-    ssh_keys_state: present
-
   tasks:
     - name: Query SSH keys
       pidginhost.cloud.ssh_keys_info:
-        state: "{{ ssh_keys_state }}"
       register: ssh_keys_result
 
     - name: Show SSH keys

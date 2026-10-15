@@ -1,20 +1,17 @@
 ---
 # Usage:
-#   ansible-playbook -i inventory/pidginhost.yml playbooks/ips_info.yml \
-#     -e "ips_state=present ip_type=ipv4"
-- name: Retrieve reserved IP addresses
+#   ansible-playbook playbooks/ips_info.yml -e "ip_type=ipv6"
+- name: List public IP addresses
   hosts: localhost
   connection: local
   gather_facts: false
 
   vars:
-    ips_state: present
-    ip_type: ipv4
+    ip_type: ipv4                     # ipv4|ipv6
 
   tasks:
     - name: Query IP list
       pidginhost.cloud.ips_info:
-        state: "{{ ips_state }}"
         ip_type: "{{ ip_type }}"
       register: ips_result
 
