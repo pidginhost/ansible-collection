@@ -5,6 +5,13 @@ action_groups:
     - bucket
     - bucket_credentials
     - buckets_info
+    - dns_record
+    - dns_records_info
+    - dns_zone
+    - dns_zones_info
+    - domain_glue_record
+    - domain_nameservers
+    - domains_info
     - firewall
     - firewall_action
     - firewalls_info

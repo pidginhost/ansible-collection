@@ -2,7 +2,7 @@
 
 ![PidginHost + Ansible](ph+an.png)
 
-The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys and object storage buckets. It also ships a dynamic inventory plugin and example playbooks.
+The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys, object storage buckets and DNS. It also ships a dynamic inventory plugin and example playbooks.
 
 Every module supports check mode and makes no changes in it. Tasks leave resources that already match unchanged. Rebooting,
 rolling back a snapshot, rotating bucket keys and allocating an IP without an address always make a change.
@@ -60,6 +60,12 @@ Run `ansible-doc pidginhost.cloud.<module>` for options and examples.
 | Account | `ssh_key` | Add, rename or remove SSH keys, optionally removing all others. |
 | | `ssh_keys_info`, `profile_info` | List SSH keys and read the account profile. |
 | Catalog | `images_info`, `packages_info`, `generations_info` | List OS images, server packages and hardware generations. |
+| DNS | `dns_zone` | Turn FreeDNS hosting on or off for a domain. |
+| | `dns_record` | Manage A, AAAA, CNAME, MX, SRV, TXT and CAA records, optionally as the only record of its name and type. |
+| | `dns_zones_info`, `dns_records_info` | List FreeDNS zones and records. |
+| | `domain_nameservers` | Set the nameservers of a registered domain. |
+| | `domain_glue_record` | Manage child nameserver hosts registered for a domain. |
+| | `domains_info` | List registered domains. |
 
 All modules belong to the `pidginhost.cloud.all` action group, so the token can be set once:
 ```yaml

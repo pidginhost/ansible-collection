@@ -75,6 +75,27 @@ def plan_rules(existing, desired, match_fields, update_fields, purge):
     return create, patch, unmatched if purge else []
 
 
+def fqdn(name):
+    """Lower case ASCII form of a domain name, without the trailing dot."""
+    name = name.strip().rstrip(".").lower()
+    try:
+        return name.encode("idna").decode("ascii")
+    except UnicodeError:
+        return name
+
+
+def dns_record_name(name, zone):
+    """Fully qualified record name with a trailing dot, as the API returns it."""
+    name = name.strip().lower()
+    if name in ("", "@"):
+        return zone + "."
+    if name.endswith("."):
+        return name
+    if name == zone or name.endswith("." + zone):
+        return name + "."
+    return "%s.%s." % (name, zone)
+
+
 def _decode(raw):
     if not raw:
         return None
@@ -219,3 +240,12 @@ class PidginHostAPI(object):
         if not cluster:
             self.module.fail_json(msg="Kubernetes cluster %s not found." % (cluster_id or name))
         return cluster
+
+    def freedns_domain(self, domain, source):
+        """FreeDNS finds internal domains by their PidginHost ID and external domains by name."""
+        if source == "external":
+            return domain
+        found = self.get("/api/domain/domain/%s/" % domain, allow_404=True)
+        if not found:
+            self.module.fail_json(msg="Domain %s not found in the account." % domain)
+        return found["id"]
