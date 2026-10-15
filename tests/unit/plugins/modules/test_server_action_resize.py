@@ -125,3 +125,29 @@ def test_disk_missing_volume_fails(api, run):
 
     assert result.failed
     assert "other" in result["msg"]
+
+
+def test_active_old_package_does_not_finish_resize(api, run):
+    api.add("GET", SERVER, detail())
+    api.add("GET", SERVER, detail())
+    api.add("GET", SERVER, detail(status="upgrading", package="cloudv-3"))
+    api.add("GET", SERVER, detail(package="cloudv-3"))
+    api.add("POST", SERVER + "modify-package/", {"upgrading": True})
+
+    result = run(server_action_resize, server_id=42, package="cloudv-3")
+
+    assert not result.failed
+    assert result["action"]["package"] == "cloudv-3"
+    assert len(api.requests("GET", SERVER)) == 4
+
+
+def test_package_id_of_current_package_is_unchanged(api, run):
+    api.add("GET", SERVER, detail())
+    api.add("GET", "/api/cloud/server-packages/7/", {"id": 7, "slug": "cloudv-1"})
+
+    for check_mode in (False, True):
+        result = run(server_action_resize, server_id=42, package="7", check_mode=check_mode)
+
+        assert not result.failed
+        assert not result.changed
+        assert api.writes() == []

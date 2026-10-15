@@ -169,3 +169,60 @@ def test_absent_missing_bucket_is_ok(api, run):
 
     assert not result.failed
     assert not result.changed
+
+
+def test_waits_for_existing_provisioning_bucket_without_writes(api, run):
+    api.add("GET", BUCKETS, [bkt(status="provisioning")])
+    api.add("GET", BUCKETS + "5/", bkt())
+
+    result = run(bucket, name="media", quota_gb=10)
+
+    assert not result.failed
+    assert not result.changed
+    assert result["bucket"]["status"] == "active"
+    assert api.writes() == []
+
+
+def test_existing_bucket_wait_timeout_does_not_claim_change(api, run):
+    api.add("GET", BUCKETS, [bkt(status="upgrading")])
+    api.add("GET", BUCKETS + "5/", bkt(status="upgrading"))
+
+    result = run(bucket, name="media", quota_gb=10, timeout=0)
+
+    assert result.failed
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_failed_existing_bucket_is_not_reported_ready(api, run):
+    api.add("GET", BUCKETS, [bkt(status="failed")])
+    api.add("GET", BUCKETS + "5/", bkt(status="failed"))
+
+    result = run(bucket, name="media")
+
+    assert result.failed
+    assert not result.changed
+
+
+def test_deletion_timeout_fails(api, run):
+    api.add("GET", BUCKETS, [bkt(status="cancelling")])
+
+    result = run(bucket, name="media", state="absent", timeout=0)
+
+    assert result.failed
+    assert not result.changed
+    assert "not deleted in time" in result["msg"]
+
+
+def test_waits_for_provisioning_before_resizing_existing_bucket(api, run):
+    api.add("GET", BUCKETS, [bkt(status="provisioning")])
+    api.add("GET", BUCKETS + "5/", bkt(status="provisioning"))
+    api.add("GET", BUCKETS + "5/", bkt())
+    api.add("POST", BUCKETS + "5/resize/", bkt(quota_gb=20))
+
+    result = run(bucket, name="media", quota_gb=20)
+
+    assert not result.failed
+    assert result.changed
+    assert api.calls[-1] == ("POST", BUCKETS + "5/resize/", {"quota_gb": 20})
+    assert len(api.requests("GET", BUCKETS + "5/")) == 2

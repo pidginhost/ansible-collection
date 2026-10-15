@@ -132,11 +132,13 @@ options:
   destroy_protection:
     description:
       - Protect the server from deletion.
+      - Enabling protection on a new server requires O(wait=true).
       - With O(state=absent), V(false) turns protection off before deleting the server.
     type: bool
   wait:
     description:
       - Wait until the server is active after creation, or gone after deletion.
+      - Also wait for an earlier deletion that is still in progress, without requesting deletion again.
     type: bool
     default: true
   unique_hostname:
@@ -214,6 +216,8 @@ def create(api, module):
     missing = [name for name in ("image", "package") if not params[name]]
     if missing:
         module.fail_json(msg="Creating a server requires: %s" % ", ".join(missing))
+    if params["destroy_protection"] and not params["wait"]:
+        module.fail_json(msg="Creating a server with destroy_protection=true requires wait=true.")
     if module.check_mode:
         module.exit_json(changed=True, server={})
 
@@ -257,16 +261,18 @@ def update(api, module, server):
 
 
 def delete(api, module, server):
+    changed = server["status"] not in ("cancelling", "terminating")
     if module.check_mode:
-        module.exit_json(changed=True, server=server)
-    if server["destroy_protection"] and module.params["destroy_protection"] is False:
-        set_destroy_protection(api, server["id"], False)
-    api.delete(server_path(server["id"]))
+        module.exit_json(changed=changed, server=server)
+    if changed:
+        if server["destroy_protection"] and module.params["destroy_protection"] is False:
+            set_destroy_protection(api, server["id"], False)
+        api.delete(server_path(server["id"]))
     if module.params["wait"]:
         gone = api.wait_for(lambda: api.get(server_path(server["id"]), allow_404=True) is None, bool)
         if not gone:
-            module.fail_json(changed=True, msg="Server %s was not deleted in time." % server["id"], server=server)
-    module.exit_json(changed=True, server=server)
+            module.fail_json(changed=changed, msg="Server %s was not deleted in time." % server["id"], server=server)
+    module.exit_json(changed=changed, server=server)
 
 
 def main():

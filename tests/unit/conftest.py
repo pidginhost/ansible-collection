@@ -76,6 +76,7 @@ class FakeAPI:
     def __call__(self, module, url, data=None, headers=None, method=None, timeout=None, **kwargs):
         assert url.startswith("https://www.pidginhost.com/"), url
         assert headers["Authorization"] == "Token test-token"
+        assert kwargs["unredirected_headers"] == ["Authorization"]
         path = url[len("https://www.pidginhost.com"):]
         self.calls.append((method, path, json.loads(data) if data else None))
         queue = self.routes.get((method, path))

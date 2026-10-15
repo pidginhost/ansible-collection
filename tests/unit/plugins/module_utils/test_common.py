@@ -104,3 +104,26 @@ def test_empty_array_stays_a_list(api, make_module):
     api.add("GET", SERVERS + "9/snapshots/", [])
 
     assert PidginHostAPI(make_module()).get(SERVERS + "9/snapshots/") == []
+
+
+def test_read_failure_after_mutation_reports_change(api, make_module):
+    api.add("POST", SERVERS, {"id": 5}, status=201)
+    api.add("GET", SERVERS + "5/", status=-1)
+    client = PidginHostAPI(make_module())
+    client.post(SERVERS, {"hostname": "web1.example.com"})
+
+    with pytest.raises(Exception) as exc:
+        client.get(SERVERS + "5/")
+
+    assert exc.value.failed
+    assert exc.value.changed
+
+
+def test_first_request_failure_does_not_claim_change(api, make_module):
+    api.add("POST", SERVERS, {"detail": "Invalid request."}, status=400)
+
+    with pytest.raises(Exception) as exc:
+        PidginHostAPI(make_module()).post(SERVERS, {})
+
+    assert exc.value.failed
+    assert not exc.value.changed

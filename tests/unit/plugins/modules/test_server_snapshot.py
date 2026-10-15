@@ -124,12 +124,15 @@ def test_absent_delete_timeout_fails(api, run):
     assert result.changed
 
 
-def test_rollback_waits_until_server_active(api, run):
-    with_server(api)
-    with_server(api, status="upgrading")
+def test_rollback_waits_for_fresh_completion(api, run):
     with_server(api)
     api.add("GET", SNAPS, [snap()])
     api.add("POST", SNAPS + "before-upgrade/rollback/", {"queued": True}, status=202)
+    event = {"message": 'Rollback to snapshot "before-upgrade" completed (user@example.com).',
+             "date": "2026-01-01 12:00"}
+    api.add("GET", SERVER + "activity/", {"logs": [event]})
+    api.add("GET", SERVER + "activity/", {"logs": [event]})
+    api.add("GET", SERVER + "activity/", {"logs": [event, event]})
 
     result = run(server_snapshot, server_id=42, name="before-upgrade", state="rollback")
 
@@ -137,7 +140,7 @@ def test_rollback_waits_until_server_active(api, run):
     assert result.changed
     assert result["snapshot"] == snap()
     assert [(c[0], c[1]) for c in api.writes()] == [("POST", SNAPS + "before-upgrade/rollback/")]
-    assert len(api.requests("GET", SERVER)) == 3
+    assert len(api.requests("GET", SERVER + "activity/")) == 3
 
 
 def test_rollback_check_mode_makes_no_writes(api, run):
@@ -158,3 +161,93 @@ def test_rollback_missing_snapshot_fails(api, run):
 
     assert result.failed
     assert api.writes() == []
+
+
+def test_existing_preparing_snapshot_waits_without_writes(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [snap(state="prepare")])
+    api.add("GET", SNAPS, [snap(state="prepare")])
+    api.add("GET", SNAPS, [snap()])
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade")
+
+    assert not result.failed
+    assert not result.changed
+    assert result["snapshot"]["state"] == ""
+    assert api.writes() == []
+
+
+def test_existing_preparing_snapshot_times_out(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [snap(state="prepare")])
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", timeout=0)
+
+    assert result.failed
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_unknown_snapshot_state_is_not_ready(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [])
+    api.add("GET", SNAPS, [snap(state="delete")])
+    api.add("POST", SNAPS, {"queued": True}, status=202)
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", timeout=0)
+
+    assert result.failed
+    assert result.changed
+
+
+def test_existing_deleting_snapshot_is_not_deleted_again(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [snap(state="delete")])
+    api.add("GET", SNAPS, [])
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", state="absent")
+
+    assert not result.failed
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_rollback_timeout_ignores_old_completion(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [snap()])
+    api.add("POST", SNAPS + "before-upgrade/rollback/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": [
+        {"date": "2026-01-01 12:00", "message": 'Rollback to snapshot "before-upgrade" completed.'}]})
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", state="rollback", timeout=0)
+
+    assert result.failed
+    assert result.changed
+    assert "not confirmed in time" in result["msg"]
+
+
+def test_rollback_reports_new_failure(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [snap()])
+    api.add("POST", SNAPS + "before-upgrade/rollback/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [
+        {"date": "2026-01-01 12:00", "message": 'Rollback to snapshot "before-upgrade" could not be completed.'}]})
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", state="rollback")
+
+    assert result.failed
+    assert result.changed
+    assert "failed" in result["msg"]
+
+
+def test_rollback_without_wait_does_not_read_activity(api, run):
+    with_server(api)
+    api.add("GET", SNAPS, [snap()])
+    api.add("POST", SNAPS + "before-upgrade/rollback/", {"queued": True}, status=202)
+
+    result = run(server_snapshot, server_id=42, name="before-upgrade", state="rollback", wait=False)
+
+    assert not result.failed
+    assert result.changed
+    assert not api.requests("GET", SERVER + "activity/")

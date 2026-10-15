@@ -64,6 +64,7 @@ options:
       - IDs or hostnames of the servers allowed to use the floating IP.
       - When set, this is the exact list. Missing servers are authorized and the others are removed.
       - Hostnames must be unique in the account.
+      - Unknown or ambiguous hostnames fail before the floating IP is allocated or changed.
     type: list
     elements: str
 """
@@ -179,6 +180,9 @@ def main():
             api.delete("%s%s/" % (base, fip["id"]))
         module.exit_json(changed=True, floating_ip=fip)
 
+    wanted = None
+    if params["authorized_servers"] is not None:
+        wanted = server_ids(api, module, params["authorized_servers"])
     changed = False
     if not fip:
         if params["floating_ip_id"] or params["address"]:
@@ -195,8 +199,7 @@ def main():
             api.post(path + "rdns/", {"reverse_dns": params["reverse_dns"]})
 
     authorized = set(a["server_id"] for a in api.list(path + "authorizations/"))
-    if params["authorized_servers"] is not None:
-        wanted = server_ids(api, module, params["authorized_servers"])
+    if wanted is not None:
         for action, ids in (("authorize", wanted - authorized), ("unauthorize", authorized - wanted)):
             for server_id in sorted(ids):
                 changed = True

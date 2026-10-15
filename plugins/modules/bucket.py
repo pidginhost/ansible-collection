@@ -53,6 +53,7 @@ options:
   wait:
     description:
       - Wait until the bucket is active after creation or resize, or gone after deletion.
+      - Also wait for an earlier creation or resize that is still in progress.
     type: bool
     default: true
 """
@@ -108,14 +109,14 @@ def find(api, name):
     return api.find_one(api.list(BUCKETS), "buckets", name=name)
 
 
-def wait_active(api, module, bucket):
+def wait_active(api, module, bucket, changed=True):
     if not module.params["wait"] or bucket["status"] == "active":
         return bucket
     done = api.wait_for(lambda: api.get("%s%s/" % (BUCKETS, bucket["id"])),
                         lambda b: b["status"] in ("active", "failed"))
     if not done or done["status"] != "active":
         module.fail_json(
-            changed=True,
+            changed=changed,
             msg="Bucket %s %s." % (bucket["name"], "failed" if done else "did not become active in time"),
             bucket=done or bucket,
         )
@@ -136,6 +137,8 @@ def update(api, module, bucket):
     params = module.params
     if bucket["status"] in DELETING:
         module.fail_json(msg="Bucket %s is being deleted. Run again once it is gone." % bucket["name"], bucket=bucket)
+    if not module.check_mode and bucket["status"] in ("pending", "provisioning", "upgrading", "failed"):
+        bucket = wait_active(api, module, bucket, changed=False)
     resize = params["quota_gb"] is not None and params["quota_gb"] != bucket["quota_gb"]
     visibility = params["public_read"] is not None and params["public_read"] != bucket["public_read"]
     if not (resize or visibility):

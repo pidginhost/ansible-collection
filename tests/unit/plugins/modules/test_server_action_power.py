@@ -70,10 +70,17 @@ def test_reboot_running_server_is_changed(api, run):
     with_server(api)
     api.add("GET", POWER, {"status": "running"})
     api.add("POST", POWER, {"status": "running"})
+    usage = SERVERS + "42/usage/"
+    api.add("GET", usage, {"status": "running", "uptime": 100})
+    api.add("GET", usage, {"status": "running", "uptime": 101})
+    api.add("GET", usage, {"status": "running", "uptime": 1})
 
     result = run(server_action_power, server_id=42, state="reboot")
 
+    assert not result.failed, result.result
     assert result.changed
+    assert result["action"] == {"status": "running"}
+    assert len(api.requests("GET", usage)) == 3
     assert api.writes() == [("POST", POWER, {"action": "reboot"})]
 
 
@@ -135,3 +142,60 @@ def test_unknown_server_fails(api, run):
 
     assert result.failed
     assert api.writes() == []
+
+
+def test_reboot_times_out_if_uptime_does_not_reset(api, run):
+    with_server(api)
+    api.add("GET", POWER, {"status": "running"})
+    api.add("POST", POWER, {"status": "running"})
+    api.add("GET", SERVERS + "42/usage/", {"status": "running", "uptime": 100})
+
+    result = run(server_action_power, server_id=42, state="reboot", timeout=0)
+
+    assert result.failed
+    assert result.changed
+
+
+def test_reboot_waits_for_running_after_stop(api, run):
+    with_server(api)
+    api.add("GET", POWER, {"status": "running"})
+    api.add("POST", POWER, {"status": "running"})
+    usage = SERVERS + "42/usage/"
+    api.add("GET", usage, {"status": "running", "uptime": 0})
+    api.add("GET", usage, {"status": "stopped", "uptime": 0})
+    api.add("GET", usage, {"status": "running", "uptime": 1})
+
+    result = run(server_action_power, server_id=42, state="reboot")
+
+    assert not result.failed
+    assert result["action"] == {"status": "running"}
+    assert len(api.requests("GET", usage)) == 3
+
+
+def test_reboot_without_wait_does_not_read_usage(api, run):
+    with_server(api)
+    api.add("GET", POWER, {"status": "running"})
+    api.add("POST", POWER, {"status": "running"})
+
+    result = run(server_action_power, server_id=42, state="reboot", wait=False)
+
+    assert not result.failed
+    assert result.changed
+    assert not api.requests("GET", SERVERS + "42/usage/")
+
+
+def test_reboot_detects_new_boot_even_when_uptime_exceeds_initial_value(api, run, monkeypatch):
+    with_server(api)
+    api.add("GET", POWER, {"status": "running"})
+    api.add("POST", POWER, {"status": "running"})
+    usage = SERVERS + "42/usage/"
+    api.add("GET", usage, {"status": "running", "uptime": 0})
+    api.add("GET", usage, {"status": "running", "uptime": 1})
+    clock = iter([10, 10, 11, 11, 14])
+    monkeypatch.setattr(server_action_power.time, "monotonic", lambda: next(clock))
+
+    result = run(server_action_power, server_id=42, state="reboot")
+
+    assert not result.failed
+    assert result.changed
+    assert len(api.requests("GET", usage)) == 3

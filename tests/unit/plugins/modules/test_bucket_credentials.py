@@ -24,14 +24,15 @@ def test_reveals_credentials_without_change(api, run):
     assert result["credentials"] == CREDS
 
 
-def test_reveal_runs_in_check_mode(api, run):
+def test_reveal_check_mode_makes_no_writes(api, run):
     api.add("GET", BUCKETS, [BUCKET])
-    api.add("POST", BUCKETS + "5/credentials/reveal/", CREDS)
 
     result = run(bucket_credentials, check_mode=True, name="media")
 
     assert not result.changed
-    assert result["credentials"] == CREDS
+    assert not result.failed
+    assert result["credentials"] == {}
+    assert api.writes() == []
 
 
 def test_rotates_credentials(api, run):

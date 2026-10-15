@@ -122,6 +122,8 @@ def test_detaches_without_server(api, run):
 
 def test_detach_check_mode_makes_no_writes(api, run):
     api.add("GET", IPV4, listing(attached()))
+    api.add("GET", SERVERS, listing({"id": 42, "hostname": "web1"}))
+    api.add("GET", SERVERS + "42/", {"id": 42, "hostname": "web1"})
 
     result = run(ip_action, check_mode=True, state="absent", ip_address="192.0.2.10", server_hostname="web1")
 
@@ -141,9 +143,36 @@ def test_detach_unattached_is_unchanged(api, run):
 
 def test_detach_from_other_server_is_unchanged(api, run):
     api.add("GET", IPV4, listing(attached()))
+    api.add("GET", SERVERS, listing({"id": 43, "hostname": "web2"}))
+    api.add("GET", SERVERS + "43/", {"id": 43, "hostname": "web2"})
 
     result = run(ip_action, state="absent", ip_address="192.0.2.10", server_hostname="web2")
 
     assert not result.failed
     assert not result.changed
     assert api.writes() == []
+
+
+def test_detach_rejects_duplicate_hostname(api, run):
+    api.add("GET", IPV4, listing(ip(attached=True, server="web1.example.com", server_id=42)))
+    api.add("GET", SERVERS, listing({"id": 42, "hostname": "web1.example.com"},
+                                    {"id": 43, "hostname": "web1.example.com"}))
+
+    result = run(ip_action, state="absent", ip_address="192.0.2.10", server_hostname="web1.example.com")
+
+    assert result.failed
+    assert "use an id" in result["msg"]
+    assert api.writes() == []
+
+
+def test_detach_by_id_ignores_duplicate_hostname(api, run):
+    api.add("GET", IPV4, listing(attached()))
+    api.add("POST", IPV4 + "7/detach/", {"detached": True})
+    api.add("GET", IPV4 + "7/", ip())
+
+    result = run(ip_action, state="absent", ip_address="192.0.2.10", server_id=42,
+                 server_hostname="web1.example.com")
+
+    assert not result.failed
+    assert result.changed
+    assert len(api.writes()) == 1

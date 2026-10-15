@@ -145,3 +145,26 @@ def test_unknown_server_hostname_fails(api, run):
     assert result.failed
     assert "web9" in result["msg"]
     assert api.writes() == []
+
+
+def test_missing_authorized_server_does_not_allocate_ip(api, run):
+    api.add("GET", FIP4, listing())
+    api.add("GET", SERVERS, listing())
+
+    result = run(floating_ip, label="vip", authorized_servers=["missing.example.com"])
+
+    assert result.failed
+    assert api.writes() == []
+
+
+def test_authorizations_on_later_pages_are_preserved(api, run):
+    api.add("GET", FIP4, listing(fip()))
+    api.add("GET", FIP4 + "3/authorizations/", dict(auths(42), next="page=2"))
+    api.add("GET", FIP4 + "3/authorizations/?page=2", auths(43))
+
+    result = run(floating_ip, label="vip", authorized_servers=["42", "43"])
+
+    assert not result.failed
+    assert not result.changed
+    assert result["floating_ip"]["authorized_servers"] == [42, 43]
+    assert api.writes() == []

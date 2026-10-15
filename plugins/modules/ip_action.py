@@ -137,8 +137,15 @@ def main():
         result = api.post("%s%s/attach-ipv%d/" % (SERVERS, server["id"], version),
                           {"ipv%d" % version: ip["address"], "reboot": params["reboot"]})
     else:
-        target = params["server_id"] or params["server_hostname"]
-        if not ip["attached"] or (target and target not in (ip["server_id"], ip["server"])):
+        if not ip["attached"]:
+            module.exit_json(changed=False, ip_result={}, ip=ip)
+        target_id = params["server_id"]
+        if target_id is None and params["server_hostname"]:
+            target = api.find_server(hostname=params["server_hostname"])
+            if not target:
+                module.exit_json(changed=False, ip_result={}, ip=ip)
+            target_id = target["id"]
+        if target_id is not None and target_id != ip["server_id"]:
             module.exit_json(changed=False, ip_result={}, ip=ip)
         if module.check_mode:
             module.exit_json(changed=True, ip_result={}, ip=ip)

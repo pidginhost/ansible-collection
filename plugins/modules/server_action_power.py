@@ -54,6 +54,7 @@ options:
   wait:
     description:
       - Wait until the server is running after V(start) or V(reboot), or stopped after V(stop) or V(shutdown).
+      - A reboot must reset uptime or pass through a stopped state before it is reported complete.
       - O(timeout) applies to each wait.
     type: bool
     default: true
@@ -89,9 +90,31 @@ action:
     status: running
 """
 
+import time
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ..module_utils.common import SERVERS, PidginHostAPI, pidginhost_argument_spec
+
+
+def wait_reboot(api, path, before, observed_at):
+    stopped = [False]
+
+    def fetch():
+        started_at = time.monotonic()
+        return api.get(path), started_at
+
+    def ready(observation):
+        usage, started_at = observation
+        if usage["status"] == "stopped":
+            stopped[0] = True
+        # Allow for integer uptime rounding and request latency. A fast reboot
+        # can finish between polls, so observing a stopped state is not required.
+        reset = usage["uptime"] < before["uptime"] + started_at - observed_at - 1
+        return usage["status"] == "running" and (stopped[0] or reset)
+
+    done = api.wait_for(fetch, ready)
+    return {"status": done[0]["status"]} if done is not None else None
 
 
 def main():
@@ -120,6 +143,10 @@ def main():
     if module.check_mode:
         module.exit_json(changed=True, action=power)
 
+    usage_path = "%s%s/usage/" % (SERVERS, server["id"])
+    if state == "reboot" and params["wait"]:
+        before = api.get(usage_path)
+        observed_at = time.monotonic()
     power = api.post(path, {"action": state})
     if not params["wait"]:
         module.exit_json(changed=True, action=power)
@@ -127,7 +154,10 @@ def main():
     def reached():
         return api.wait_for(lambda: api.get(path), lambda p: p["status"] == target)
 
-    done = reached()
+    if state == "reboot":
+        done = wait_reboot(api, usage_path, before, observed_at)
+    else:
+        done = reached()
     if done is None and state == "shutdown" and params["force_power_off"]:
         api.post(path, {"action": "stop"})
         done = reached()

@@ -20,7 +20,8 @@ def listing(*items):
 
 def detail(*private):
     other = {"interface": "eth2", "address": "203.0.113.10", "network": "203.0.113.0/24"}
-    return {"id": 42, "hostname": "web1", "networks": {"public": {}, "private": [other] + list(private)}}
+    return {"id": 42, "hostname": "web1", "status": "active",
+            "networks": {"public": {}, "private": [other] + list(private)}}
 
 
 def test_adds_server_by_hostname_to_network_by_cidr(api, run):
@@ -118,3 +119,35 @@ def test_present_missing_network_fails(api, run):
 
     assert result.failed
     assert "9" in result["msg"]
+
+
+def test_invalid_replacement_keeps_existing_membership(api, run):
+    api.add("GET", NETS + "5/", NET)
+    api.add("GET", SERVERS + "42/", detail(MEMBER))
+
+    for address in ("invalid", "203.0.113.10", "198.51.100.0", "198.51.100.255", "2001:db8::1"):
+        result = run(private_network_server, network="5", server_id=42, address=address)
+
+        assert result.failed
+        assert api.writes() == []
+
+
+def test_occupied_replacement_keeps_existing_membership(api, run):
+    api.add("GET", NETS + "5/", dict(NET, servers=[{"server": "other.example.com", "address": "198.51.100.20"}]))
+    api.add("GET", SERVERS + "42/", detail(MEMBER))
+
+    result = run(private_network_server, network="5", server_id=42, address="198.51.100.20")
+
+    assert result.failed
+    assert "already in use" in result["msg"]
+    assert api.writes() == []
+
+
+def test_inactive_server_keeps_existing_membership(api, run):
+    api.add("GET", NETS + "5/", NET)
+    api.add("GET", SERVERS + "42/", dict(detail(MEMBER), status="upgrading"))
+
+    result = run(private_network_server, network="5", server_id=42, address="198.51.100.20")
+
+    assert result.failed
+    assert api.writes() == []

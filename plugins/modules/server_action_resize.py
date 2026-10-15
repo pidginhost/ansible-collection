@@ -46,8 +46,8 @@ options:
     default: false
   package_name:
     description:
-      - Package slug to move the server to. Required when O(disk=false). See M(pidginhost.cloud.packages_info).
-      - Nothing is done when the server already uses this package. Use the slug, not the ID, to keep this check working.
+      - Package ID or slug to move the server to. Required when O(disk=false). See M(pidginhost.cloud.packages_info).
+      - Nothing is done when the server already uses this package.
     type: str
     aliases: [package]
   volume_alias:
@@ -64,7 +64,7 @@ options:
     type: str
   wait:
     description:
-      - Wait until the server is C(active) again after a package change.
+      - Wait until the server is C(active) with the requested package after a package change.
     type: bool
     default: true
   product:
@@ -108,6 +108,8 @@ from ..module_utils.common import SERVERS, PidginHostAPI, drop_none, info_argume
 
 def change_package(api, module, server):
     package = module.params["package_name"]
+    if package.isdigit():
+        package = api.get("/api/cloud/server-packages/%s/" % package)["slug"]
     if server["package"] == package:
         module.exit_json(changed=False, action=server)
     if module.check_mode:
@@ -118,7 +120,7 @@ def change_package(api, module, server):
     if not module.params["wait"]:
         module.exit_json(changed=True, action=server)
     # The server goes through upgrading and back to active.
-    done = api.wait_for(lambda: api.get(path), lambda s: s["status"] == "active")
+    done = api.wait_for(lambda: api.get(path), lambda s: s["status"] == "active" and s["package"] == package)
     if not done:
         module.fail_json(
             changed=True, msg="Server %s did not become active in time after the package change." % server["id"],

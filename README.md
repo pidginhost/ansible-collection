@@ -4,7 +4,9 @@
 
 The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys and object storage buckets. It also ships a dynamic inventory plugin and example playbooks.
 
-Every module is idempotent and supports check mode.
+Every module supports check mode and makes no API writes during a dry run. Bucket credentials are omitted in check mode.
+State-based tasks leave matching resources unchanged. Allocating an IP without an address, rebooting, rolling back a snapshot
+and rotating credentials always request an operation.
 
 ## Requirements
 - ansible-core 2.16 or later. Tested on ansible-core 2.16 and 2.21 (Ansible 14).
@@ -81,6 +83,15 @@ All modules belong to the `pidginhost.cloud.all` action group, so the token can 
 ansible-inventory -i inventory/pidginhost.yml --graph
 ```
 Each host gets the server attributes as variables and `ansible_user` set to the default user of its image. Use `compose`, `groups` and `keyed_groups` to shape the inventory. The sample caches results in `./tmp/` for five minutes; delete that directory after switching accounts.
+Connection errors and timeouts are reported as inventory errors. API tokens are not forwarded on redirects.
+
+## Waiting for changes
+Reboot tasks confirm a restart before returning. Snapshot rollback tasks wait for a new completion entry in the server activity
+log and fail if completion cannot be confirmed. Pending bucket, snapshot and server deletion tasks can be rerun with waiting
+enabled without submitting another operation. API failures report any changes already completed by the task.
+
+Creating a server with deletion protection requires `wait: true`. Private network address changes reject invalid or occupied
+addresses before removing the old membership. IP detach tasks reject ambiguous hostnames; use a server ID to select one.
 
 ## Example playbooks
 `playbooks/` holds one short playbook per module family. `playbooks/profile_info.yml` is a safe first run that only reads the account profile:

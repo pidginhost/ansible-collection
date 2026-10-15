@@ -18,6 +18,7 @@ description:
   - Read the S3 access key and secret key of a bucket, or rotate them.
   - The secret key is returned in clear text. Set C(no_log=true) on the task that registers the result.
   - The API records every read and rotation in an audit trail.
+  - Check mode returns no credentials and makes no audit entry.
   - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/cloud/cloud_buckets_credentials_reveal_create).
 
 author:
@@ -58,7 +59,7 @@ EXAMPLES = r"""
 RETURN = r"""
 credentials:
   description:
-    - S3 connection details. Empty when O(rotate=true) in check mode.
+    - S3 connection details. Empty in check mode.
   returned: success
   type: dict
   contains:
@@ -102,8 +103,8 @@ def main():
     bucket = api.find_one(api.list(BUCKETS), "buckets", name=module.params["name"])
     if not bucket:
         module.fail_json(msg="Bucket %s not found." % module.params["name"])
-    if rotate and module.check_mode:
-        module.exit_json(changed=True, credentials={})
+    if module.check_mode:
+        module.exit_json(changed=rotate, credentials={})
     path = "%s%s/credentials/%s/" % (BUCKETS, bucket["id"], "rotate" if rotate else "reveal")
     module.exit_json(changed=rotate, credentials=api.post(path))
 

@@ -49,6 +49,7 @@ options:
     description:
       - Private IPv4 address of the server in the network. Assigned automatically when not set.
       - A server already on the network with another address is removed and added again with this one.
+      - Invalid or occupied addresses are rejected before removing the current membership.
     type: str
 """
 
@@ -79,6 +80,8 @@ server:
     network: 198.51.100.0/24
 """
 
+import ipaddress
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ..module_utils.common import SERVERS, PidginHostAPI, drop_none, pidginhost_argument_spec
@@ -94,6 +97,21 @@ def find_network(api, network):
 
 def membership(server, network):
     return next((m for m in server["networks"]["private"] if m["network"] == network["address"]), {})
+
+
+def validate_address(module, network):
+    address = module.params["address"]
+    if address is None:
+        return
+    try:
+        host = ipaddress.IPv4Address(address)
+        subnet = ipaddress.IPv4Network(network["address"])
+    except ValueError:
+        module.fail_json(msg="address must be a valid IPv4 address in the private network.")
+    if host not in subnet or (subnet.prefixlen < 31 and host in (subnet.network_address, subnet.broadcast_address)):
+        module.fail_json(msg="Address %s is not a host address in %s." % (address, network["address"]))
+    if any(m["address"] == address for m in network["servers"]):
+        module.fail_json(msg="Address %s is already in use on the private network." % address)
 
 
 def main():
@@ -126,6 +144,10 @@ def main():
         module.exit_json(changed=False, server=member)
     if not present and not member:
         module.exit_json(changed=False, server={})
+    if present:
+        validate_address(module, network)
+        if server["status"] != "active":
+            module.fail_json(msg="Server %s must be active before changing its private network membership." % server["id"])
     if module.check_mode:
         module.exit_json(changed=True, server=member)
 

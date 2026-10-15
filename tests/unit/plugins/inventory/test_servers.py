@@ -55,6 +55,7 @@ def fake_api(monkeypatch, plugin):
 
     def open_url(url, headers=None, method=None, timeout=None, **kwargs):
         assert headers["Authorization"] == "Token test-token"
+        assert kwargs["unredirected_headers"] == ["Authorization"]
         path = url[len("https://www.pidginhost.com"):]
         calls.append(path)
         if path not in routes:
@@ -65,9 +66,9 @@ def fake_api(monkeypatch, plugin):
     return routes, calls
 
 
-def parse(plugin, tmp_path, config):
+def parse(plugin, tmp_path, config, token="test-token"):
     path = tmp_path / "pidginhost.yml"
-    path.write_text("plugin: pidginhost.cloud.servers\ntoken: test-token\n" + config)
+    path.write_text("plugin: pidginhost.cloud.servers\ntoken: " + json.dumps(token) + "\n" + config)
     inventory = InventoryData()
     plugin.parse(inventory, DataLoader(), str(path), cache=False)
     return inventory
@@ -101,3 +102,21 @@ def test_api_error_is_reported(plugin, fake_api, tmp_path):
         parse(plugin, tmp_path, "")
 
     assert "401" in str(exc.value)
+
+
+def test_token_template_is_evaluated(plugin, fake_api, tmp_path, monkeypatch):
+    monkeypatch.setenv("PIDGINHOST_TOKEN", "test-token")
+
+    inventory = parse(plugin, tmp_path, "", token="{{ lookup('ansible.builtin.env', 'PIDGINHOST_TOKEN') }}")
+
+    assert "web1.example.com" in inventory.hosts
+
+
+def test_socket_timeout_is_reported(plugin, tmp_path, monkeypatch):
+    def timed_out(*args, **kwargs):
+        raise TimeoutError("request timed out")
+
+    monkeypatch.setattr(sys.modules[type(plugin).__module__], "open_url", timed_out)
+
+    with pytest.raises(AnsibleError, match="request timed out"):
+        parse(plugin, tmp_path, "")

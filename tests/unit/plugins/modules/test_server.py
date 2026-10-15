@@ -154,3 +154,62 @@ def test_absent_fails_when_server_outlives_timeout(api, run):
     assert result.failed
     assert result.changed
     assert "not deleted in time" in result["msg"]
+
+
+def test_protected_create_requires_wait_before_writes(api, run):
+    api.add("GET", SERVERS, listing())
+
+    for check_mode in (False, True):
+        result = run(server, check_mode=check_mode, hostname="web1.example.com", image="ubuntu24",
+                     package="cloudv-1", wait=False, destroy_protection=True)
+
+        assert result.failed
+        assert "requires wait=true" in result["msg"]
+        assert api.writes() == []
+
+
+def test_protected_create_enables_protection_after_provisioning(api, run):
+    api.add("GET", SERVERS, listing())
+    api.add("POST", SERVERS, {"id": 42}, status=201)
+    api.add("GET", SERVERS + "42/", detail())
+    api.add("POST", SERVERS + "42/destroy-protection/", {"destroy_protection": True})
+
+    result = run(server, hostname="web1.example.com", image="ubuntu24", package="cloudv-1", destroy_protection=True)
+
+    assert not result.failed
+    assert result["server"]["destroy_protection"] is True
+    assert api.writes()[-1] == ("POST", SERVERS + "42/destroy-protection/", {"destroy_protection": True})
+
+
+def test_already_deleting_server_waits_without_writes(api, run):
+    api.add("GET", SERVERS + "42/", detail(status="cancelling"))
+    api.add("GET", SERVERS + "42/", status=404)
+
+    result = run(server, server_id=42, state="absent")
+
+    assert not result.failed
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_already_deleting_server_timeout_does_not_claim_change(api, run):
+    api.add("GET", SERVERS + "42/", detail(status="terminating"))
+
+    result = run(server, server_id=42, state="absent", timeout=0)
+
+    assert result.failed
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_error_after_create_reports_change(api, run):
+    api.add("GET", SERVERS, listing())
+    api.add("POST", SERVERS, {"id": 42}, status=201)
+    api.add("GET", SERVERS + "42/", detail())
+    api.add("POST", SERVERS + "42/destroy-protection/", {"detail": "Could not enable protection."}, status=400)
+
+    result = run(server, hostname="web1.example.com", image="ubuntu24", package="cloudv-1", destroy_protection=True)
+
+    assert result.failed
+    assert result.changed
+    assert result["status_code"] == 400

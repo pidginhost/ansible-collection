@@ -64,6 +64,7 @@ class PidginHostAPI(object):
     def __init__(self, module):
         self.module = module
         self.timeout = module.params["timeout"]
+        self.changed = False
         self.headers = {
             "Authorization": "Token %s" % module.params["token"],
             "Accept": "application/json",
@@ -79,17 +80,22 @@ class PidginHostAPI(object):
             data = json.dumps(body)
             headers["Content-Type"] = "application/json"
 
-        resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method, timeout=self.timeout)
+        resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method, timeout=self.timeout,
+                               unredirected_headers=["Authorization"])
         status = info.get("status", -1)
         if status == -1:
-            self.module.fail_json(msg="PidginHost API %s %s failed: %s" % (method, path, info.get("msg")))
+            self.module.fail_json(changed=self.changed,
+                                  msg="PidginHost API %s %s failed: %s" % (method, path, info.get("msg")))
         if allow_404 and status == 404:
             return None
         if 200 <= status < 300:
+            if method in ("POST", "PATCH", "DELETE"):
+                self.changed = True
             body = _decode(resp.read() if resp else None)
             return {} if body is None else body
         response = _decode(info.get("body"))
         self.module.fail_json(
+            changed=self.changed,
             msg="PidginHost API %s %s returned HTTP %s: %s" % (method, path, status, response or info.get("msg")),
             status_code=status,
             response=response,

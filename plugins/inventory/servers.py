@@ -89,12 +89,12 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
     def _get(self, token, path, page=1):
         url = BASE_URL + path + ("?" + urlencode({"page": page}) if page > 1 else "")
         try:
-            resp = open_url(url, method="GET", timeout=self.get_option("timeout"), headers={
+            resp = open_url(url, method="GET", timeout=self.get_option("timeout"), unredirected_headers=["Authorization"], headers={
                 "Authorization": "Token %s" % token, "Accept": "application/json"})
             return json.loads(to_text(resp.read()))
         except HTTPError as e:
             raise AnsibleParserError("PidginHost API GET %s returned HTTP %s: %s" % (path, e.code, to_text(e.read())))
-        except (URLError, ValueError) as e:
+        except (OSError, URLError, ValueError) as e:
             raise AnsibleParserError("PidginHost API GET %s failed: %s" % (path, e))
 
     def _list(self, token, path):
