@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- New modules manage server snapshots, rescue mode, public IP allocation and reverse DNS, floating IPs, private networks and object storage buckets.
+- New info modules list hardware generations, floating IPs, private networks and buckets.
 - Servers can be created with a startup script, a hardware generation and high availability, and protected from deletion.
 - Server packages can be filtered by hardware generation.
 

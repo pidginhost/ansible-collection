@@ -2,78 +2,103 @@
 
 ![PidginHost + Ansible](ph+an.png)
 
-This repository contains the `pidginhost.cloud` Ansible collection used to provision and manage resources in the [PidginHost](https://www.pidginhost.com/) cloud. It ships production modules, a dynamic inventory plugin, and playbook templates that wrap the public API so you can automate server, volume, networking, and firewall workflows end to end.
+The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys and object storage buckets. It also ships a dynamic inventory plugin and example playbooks.
+
+Every module is idempotent and supports check mode.
 
 ## Requirements
-- Python 3.9+ with Ansible 2.14 or newer (`meta/runtime.yml` specifies `>=2.14.0`).
-- A valid PidginHost API token exported as `PIDGINHOST_TOKEN` or `PIDGINHOST_ACCESS_TOKEN`.
-- Ability to reach `https://www.pidginhost.com/` from the control host; no additional Python dependencies are required.
+- ansible-core 2.16 or later. Tested on ansible-core 2.16 and 2.21 (Ansible 14).
+- Python 3.9 or later on the host that runs the modules, usually the controller. No extra Python packages.
+- A PidginHost API token in `PIDGINHOST_ACCESS_TOKEN` or `PIDGINHOST_TOKEN`, or passed as the `token` option.
 
-## Repository Layout
-| Path | Purpose |
-| --- | --- |
-| `plugins/modules/` | Collection modules for servers, firewalls, networks, volumes, IPs, and account data. |
-| `plugins/module_utils/common.py` | Shared HTTP client, argument validation, and API helpers. |
-| `plugins/inventory/servers.py` | Dynamic inventory plugin that maps PidginHost servers into Ansible hosts. |
-| `playbooks/` | Ready-to-run examples such as `server.yml`, `profile_info.yml`, and `install-nginx.yml`. |
-| `inventory/pidginhost.yml` | Inventory source configured for the dynamic plugin with JSON cache support. |
-| `ansible.cfg` | Enables YAML callbacks for readable output. |
-| `AGENTS.md` | Contributor workflow, coding style, and security expectations. |
-
-## Installation & Packaging
+## Installation
 ```bash
-# Install the published collection
 ansible-galaxy collection install pidginhost.cloud
 
-# Build from source inside this repo
+# or from this repository
 ansible-galaxy collection build
-
-# Install the local artifact for testing
-ansible-galaxy collection install ./pidginhost-cloud-<version>.tar.gz -p ./collections
+ansible-galaxy collection install ./pidginhost-cloud-<version>.tar.gz
 ```
 
 ## Authentication
-Export your API token before running modules or playbooks:
 ```bash
 export PIDGINHOST_TOKEN=your-token-here
 ```
-Passing the token as a playbook variable works, but environment variables keep secrets out of files and support the inventory plugin.
+Environment variables keep the token out of playbooks and also work for the inventory plugin. Use `ansible-vault` if the token must live in a file.
 
-## Using the Modules
-- Discover packages, images, and existing resources:
-  ```bash
-  ansible localhost -m pidginhost.cloud.packages_info
-  ansible localhost -m pidginhost.cloud.images_info
-  ansible localhost -m pidginhost.cloud.servers_info
-  ```
-- Create or delete servers via the sample playbook:
-  ```bash
-  ansible-playbook -i inventory/pidginhost.yml playbooks/server.yml \
-    -e "server_state=present server_hostname=my-host.example server_image=ubuntu22 \
-        server_package=cloudv-2 server_ssh_pub_key='ssh-ed25519 AAAA... user@example.com'"
-  ```
-- Resize, attach volumes, manage firewall rule sets, and assign IPs with dedicated modules such as `pidginhost.cloud.server_action_resize`, `pidginhost.cloud.volume`, `pidginhost.cloud.firewall`, and `pidginhost.cloud.ip_action`. Consult `ansible-doc <module>` for full argument specs.
+## Modules
+Run `ansible-doc pidginhost.cloud.<module>` for options and examples.
 
-## Dynamic Inventory
-`plugins/inventory/servers.py` turns PidginHost servers into inventory hosts with cached facts and optional grouping:
+| Area | Module | Purpose |
+| --- | --- | --- |
+| Servers | `server` | Create, update or delete a server. Startup script, hardware generation, HA and destroy protection. |
+| | `server_action_power` | Start, stop, shut down or reboot a server. |
+| | `server_action_resize` | Change a server package, or grow one of its volumes. |
+| | `server_snapshot` | Create, delete or roll back to a server snapshot. |
+| | `server_rescue` | Boot a server into rescue mode or a catalog ISO, and back. |
+| | `servers_info` | List servers, or one server with snapshots, usage, traffic, activity and boot ISOs. |
+| | `server_public_ip` | Read the public addresses of a server. |
+| | `public_interface_info` | Read the public interface and firewall settings of a server. |
+| Storage | `volume` | Create, grow or delete a volume. |
+| | `volume_action` | Attach or detach a volume. |
+| | `volumes_info`, `volumes_products_info` | List volumes and storage products. |
+| | `bucket` | Create, resize, publish or delete an object storage bucket. |
+| | `bucket_credentials` | Read or rotate bucket access keys. |
+| | `buckets_info` | List buckets. |
+| Networking | `ip` | Allocate or release a public IPv4 or IPv6 address and set its reverse DNS. |
+| | `ip_action` | Attach or detach a public IP. |
+| | `ips_info` | List public IPs. |
+| | `floating_ip` | Manage a floating IP, its reverse DNS and the servers allowed to use it. |
+| | `floating_ips_info` | List floating IPs. |
+| | `private_network` | Create, update or delete a private network. |
+| | `private_network_server` | Add a server to a private network or remove it. |
+| | `private_networks_info` | List private networks. |
+| Firewall | `firewall` | Manage a firewall rules set and its rules. |
+| | `firewall_action` | Apply a rules set and default policies to a server. |
+| | `firewalls_info` | List rules sets. |
+| Account | `ssh_key` | Add, rename or remove SSH keys, optionally removing all others. |
+| | `ssh_keys_info`, `profile_info` | List SSH keys and read the account profile. |
+| Catalog | `images_info`, `packages_info`, `generations_info` | List OS images, server packages and hardware generations. |
+
+All modules belong to the `pidginhost.cloud.all` action group, so the token can be set once:
+```yaml
+- hosts: localhost
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ vault_pidginhost_token }}"
+  tasks:
+    - pidginhost.cloud.server:
+        hostname: web1.example.com
+        image: ubuntu24
+        package: cloudv-2
+        ssh_pub_key_id: "123"
+        new_ipv4: true
+```
+
+## Dynamic inventory
+`inventory/pidginhost.yml` is a ready configuration for the `pidginhost.cloud.servers` plugin:
 ```bash
 ansible-inventory -i inventory/pidginhost.yml --graph
-ansible-inventory -i inventory/pidginhost.yml --host my-host.example
 ```
-By default each host exposes network details and sets `ansible_user` to `phuser`; adjust `attributes`, `compose`, or `groups` in `inventory/pidginhost.yml` as needed.
+Each host gets the server attributes as variables and `ansible_user` set to the default user of its image. Use `compose`, `groups` and `keyed_groups` to shape the inventory. The sample caches results in `./tmp/` for five minutes; delete that directory after switching accounts.
 
-## Example Playbooks
-- `playbooks/profile_info.yml` – verifies authentication and prints account data (safe smoke test).
-- `playbooks/install-nginx.yml` – bootstraps an existing server using a temporary in-memory inventory entry.
-- Additional playbooks demonstrate volume, firewall, and IP automation patterns; copy them when building integration tests.
+## Example playbooks
+`playbooks/` holds one short playbook per module family. `playbooks/profile_info.yml` is a safe first run that only reads the account profile:
+```bash
+ansible-playbook playbooks/profile_info.yml
+```
+`playbooks/install-nginx.yml` configures an existing server over SSH.
 
-## Testing & Linting
-- Run collection sanity checks: `ansible-test sanity --python 3.11`.
-- Lint example playbooks: `ansible-lint playbooks/*.yml`.
-- Use `ansible-playbook -i localhost playbooks/profile_info.yml -v` to confirm connectivity without provisioning resources.
+## Development
+Both test suites need the checkout at a path ending in `ansible_collections/pidginhost/cloud`.
+```bash
+ansible-test units --docker
+ansible-test sanity --docker
 
-## Contributing
-Follow the conventions in `AGENTS.md`: mirror snake_case filenames under `plugins/modules/`, reuse helpers from `module_utils/common.py`, and keep commit subjects short and imperative (e.g., `Add server resize helper`). Squash commits before PRs and document verification commands. Never commit real tokens—rely on environment variables or `ansible-vault`. Clear the `./tmp/` cache when switching tenants.
+# or plain pytest, with ansible-core and pytest installed
+pytest tests/unit
+```
+Never commit real tokens.
 
 ## License
-Released under the GNU General Public License v3.0 or later. See [`LICENSE`](LICENSE) for the full text.
+GNU General Public License v3.0 or later. See [`LICENSE`](LICENSE).

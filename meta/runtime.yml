@@ -2,19 +2,31 @@
 requires_ansible: ">=2.16.0"
 action_groups:
   all:
+    - bucket
+    - bucket_credentials
+    - buckets_info
     - firewall
     - firewall_action
     - firewalls_info
+    - floating_ip
+    - floating_ips_info
+    - generations_info
     - images_info
+    - ip
     - ip_action
     - ips_info
     - packages_info
+    - private_network
+    - private_network_server
+    - private_networks_info
     - profile_info
     - public_interface_info
     - server
     - server_action_power
     - server_action_resize
     - server_public_ip
+    - server_rescue
+    - server_snapshot
     - servers_info
     - ssh_key
     - ssh_keys_info
