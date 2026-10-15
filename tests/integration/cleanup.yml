@@ -1,0 +1,113 @@
+---
+# Removes what failed integration runs left behind in the CI account: every resource whose name starts
+# with "ansible-ci-", and the private networks the tests use. Run it against the CI account only:
+#   ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml
+- name: Sweep integration test leftovers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+      timeout: 1800
+  vars:
+    prefix: ansible-ci-
+  tasks:
+    - name: Read clusters
+      pidginhost.cloud.kubernetes_clusters_info:
+      register: clusters
+
+    - name: Delete leftover clusters
+      pidginhost.cloud.kubernetes_cluster:
+        cluster_id: "{{ item.id }}"
+        state: absent
+        protected: false
+      loop: "{{ clusters.clusters | selectattr('name', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Read floating IPs
+      pidginhost.cloud.floating_ips_info:
+      register: floating
+
+    - name: Delete leftover floating IPs
+      pidginhost.cloud.floating_ip:
+        floating_ip_id: "{{ item.id }}"
+        version: "{{ item.version }}"
+        state: absent
+      loop: "{{ floating.floating_ips | selectattr('label', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.label }}"
+
+    - name: Read servers
+      pidginhost.cloud.servers_info:
+      register: servers
+
+    - name: Delete leftover servers
+      pidginhost.cloud.server:
+        server_id: "{{ item.id }}"
+        state: absent
+        destroy_protection: false
+      loop: "{{ servers.servers | selectattr('hostname', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.hostname }}"
+
+    - name: Read volumes
+      pidginhost.cloud.volumes_info:
+      register: volumes
+
+    - name: Delete leftover volumes
+      pidginhost.cloud.volume:
+        volume_alias: "{{ item.alias }}"
+        state: absent
+      loop: "{{ volumes.volumes | selectattr('alias', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.alias }}"
+
+    - name: Read buckets
+      pidginhost.cloud.buckets_info:
+      register: buckets
+
+    - name: Delete leftover buckets
+      pidginhost.cloud.bucket:
+        name: "{{ item.name }}"
+        state: absent
+      loop: "{{ buckets.buckets | selectattr('name', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Read rules sets
+      pidginhost.cloud.firewalls_info:
+      register: firewalls
+
+    - name: Delete leftover rules sets
+      pidginhost.cloud.firewall:
+        name: "{{ item.name }}"
+        state: absent
+      loop: "{{ firewalls.firewalls | selectattr('name', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Read private networks
+      pidginhost.cloud.private_networks_info:
+      register: networks
+
+    - name: Delete leftover private networks
+      pidginhost.cloud.private_network:
+        address: "{{ item.address }}"
+        state: absent
+      loop: "{{ networks.private_networks | selectattr('address', 'in', ['198.51.100.0/24', '203.0.113.0/24']) | list }}"
+      loop_control:
+        label: "{{ item.address }}"
+
+    - name: Read SSH keys
+      pidginhost.cloud.ssh_keys_info:
+      register: keys
+
+    - name: Delete leftover SSH keys
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ item.key }}"
+        state: absent
+      loop: "{{ keys.ssh_keys | selectattr('alias', 'match', prefix) | list }}"
+      loop_control:
+        label: "{{ item.alias }}"

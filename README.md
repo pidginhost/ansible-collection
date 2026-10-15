@@ -115,15 +115,24 @@ ansible-playbook playbooks/profile_info.yml
 `playbooks/install-nginx.yml` configures an existing server over SSH.
 
 ## Development
-Both test suites need the checkout at a path ending in `ansible_collections/pidginhost/cloud`.
+Tests need the checkout at a path ending in `ansible_collections/pidginhost/cloud`.
 ```bash
-ansible-test units --docker
 ansible-test sanity --docker
-
-# or plain pytest, with ansible-core and pytest installed
-pytest tests/unit
+ansible-test units --docker
 ```
-Never commit real tokens.
+
+Integration tests create, change and delete real resources, so run them against a dedicated CI account. Every resource
+they create is named `ansible-ci-...` and removed at the end of its target.
+```bash
+cp tests/integration/integration_config.yml.template tests/integration/integration_config.yml   # add the token
+ansible-test integration --docker default pidginhost
+ansible-test integration --docker default --allow-disabled kubernetes   # slow, creates a billed cluster
+ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml   # remove leftovers
+```
+
+GitHub Actions runs sanity and unit tests on every pull request for ansible-core 2.16 to 2.21 and devel. Integration
+tests run on pushes to `main`, weekly, and on demand, using the `PIDGINHOST_CI_TOKEN` secret and the optional
+`PIDGINHOST_CI_DNS_DOMAIN` variable. Never commit real tokens.
 
 ## License
 GNU General Public License v3.0 or later. See [`LICENSE`](LICENSE).

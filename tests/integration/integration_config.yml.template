@@ -1,0 +1,6 @@
+---
+# Copy to integration_config.yml (git-ignored) and fill in. Use a dedicated CI account: the tests create billed resources.
+pidginhost_token: ""
+# Optional: a domain in that account with FreeDNS active. The dns target is skipped without it.
+pidginhost_dns_domain: ""
+pidginhost_dns_source: internal

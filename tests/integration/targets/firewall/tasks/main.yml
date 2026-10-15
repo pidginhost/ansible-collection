@@ -1,0 +1,74 @@
+---
+- name: Firewall rules set lifecycle
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+  vars:
+    ssh_rule: {direction: in, action: ACCEPT, protocol: tcp, dport: "22", source: 192.0.2.0/24}
+    web_rule: {direction: in, action: ACCEPT, protocol: tcp, dport: "443"}
+  block:
+    - name: Create the set with one rule
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        rules: ["{{ ssh_rule }}"]
+      register: create
+
+    - name: Same rules again
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        rules: ["{{ ssh_rule }}"]
+      register: create_again
+
+    - name: Add a rule
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        rules: ["{{ ssh_rule }}", "{{ web_rule }}"]
+      register: add_rule
+
+    - name: Purge down to one rule
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        rules: ["{{ web_rule }}"]
+        purge_rules: true
+      register: purge
+
+    - name: Legacy single-rule options still work and are idempotent
+      pidginhost.cloud.firewall:
+        rules_set_name: "{{ ci_prefix }}"
+        create_rules_set: false
+        direction: in
+        action: ACCEPT
+        protocol: tcp
+        dport: "443"
+      register: legacy
+
+    - name: Delete the set
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        state: absent
+      register: delete
+
+    - name: Delete the set again
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        state: absent
+      register: delete_again
+
+    - name: Changes are reported exactly when something changed
+      ansible.builtin.assert:
+        that:
+          - create is changed
+          - create.firewall.rules | length == 1
+          - create_again is not changed
+          - add_rule is changed
+          - add_rule.firewall.rules | length == 2
+          - purge is changed
+          - purge.firewall.rules | length == 1
+          - legacy is not changed
+          - delete is changed
+          - delete_again is not changed
+  always:
+    - name: Clean up the set
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        state: absent

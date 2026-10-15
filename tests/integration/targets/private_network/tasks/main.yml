@@ -1,0 +1,50 @@
+---
+- name: Private network lifecycle
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+  vars:
+    network: 198.51.100.0/24
+  block:
+    - name: Create the network
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+      register: create
+
+    - name: Create it again
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+      register: create_again
+
+    - name: Set the gateway
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+        gateway: "{{ network | regex_replace('0/24$', '254') }}"
+      register: gateway
+
+    - name: Set the same gateway again
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+        gateway: "{{ network | regex_replace('0/24$', '254') }}"
+      register: gateway_again
+
+    - name: Delete the network
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+        state: absent
+      register: delete
+
+    - name: Changes are reported exactly when something changed
+      ansible.builtin.assert:
+        that:
+          - create is changed
+          - create_again is not changed
+          - gateway is changed
+          - gateway.private_network.gateway is search("254")
+          - gateway_again is not changed
+          - delete is changed
+  always:
+    - name: Clean up the network
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+        state: absent

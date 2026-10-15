@@ -1,0 +1,60 @@
+---
+- name: Bucket lifecycle
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+  block:
+    - name: Create the bucket
+      pidginhost.cloud.bucket:
+        name: "{{ ci_prefix }}"
+        quota_gb: 1
+      register: create
+
+    - name: Create it again
+      pidginhost.cloud.bucket:
+        name: "{{ ci_prefix }}"
+        quota_gb: 1
+      register: create_again
+
+    - name: Grow the quota and make it public
+      pidginhost.cloud.bucket:
+        name: "{{ ci_prefix }}"
+        quota_gb: 2
+        public_read: true
+      register: update
+
+    - name: Read the credentials
+      pidginhost.cloud.bucket_credentials:
+        name: "{{ ci_prefix }}"
+      register: credentials
+      no_log: true
+
+    - name: Credentials are complete and reading them changes nothing
+      ansible.builtin.assert:
+        that:
+          - credentials is not changed
+          - credentials.credentials.access_key | length > 0
+          - credentials.credentials.secret_key | length > 0
+      no_log: true
+
+    - name: Delete the bucket
+      pidginhost.cloud.bucket:
+        name: "{{ ci_prefix }}"
+        state: absent
+      register: delete
+
+    - name: Changes are reported exactly when something changed
+      ansible.builtin.assert:
+        that:
+          - create is changed
+          - create.bucket.status == 'active'
+          - create_again is not changed
+          - update is changed
+          - update.bucket.quota_gb == 2
+          - update.bucket.public_read
+          - delete is changed
+  always:
+    - name: Clean up the bucket
+      pidginhost.cloud.bucket:
+        name: "{{ ci_prefix }}"
+        state: absent

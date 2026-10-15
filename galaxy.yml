@@ -24,5 +24,6 @@ build_ignore:
   - .remember
   - tmp
   - tests/output
+  - tests/integration/integration_config.yml
   - pidginhost-cloud-*.tar.gz
   - changelogs/.plugin-cache.yaml
