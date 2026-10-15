@@ -28,7 +28,7 @@ def prepare(api, *states):
 
 def test_enables_encryption_and_waits(api, run):
     prepare(api, state(), state(op_status="pending"), state(status="enabling", op_status="running"),
-          state(mode="wireguard", status="enabled_restart_required", op_status="succeeded"))
+            state(mode="wireguard", status="enabled_restart_required", op_status="succeeded"))
     api.add("POST", ENCRYPTION, {"id": 4, "status": "pending", "requested_mode": "wireguard"}, status=202)
 
     result = run(module, cluster_id=7, mode="wireguard", acknowledge_workload_restart=True)
@@ -61,7 +61,7 @@ def test_change_already_running_is_unchanged_without_wait(api, run):
 
 def test_waits_for_running_change_before_comparing(api, run):
     prepare(api, state(status="enabling", op_status="running"),
-          state(mode="wireguard", status="enabled", op_status="succeeded"))
+            state(mode="wireguard", status="enabled", op_status="succeeded"))
 
     result = run(module, cluster_id=7, mode="wireguard")
 
@@ -106,8 +106,8 @@ def test_conflict_is_reported(api, run):
 
 def test_failed_change_fails_with_reason(api, run):
     prepare(api, state(), state(op_status="pending"),
-          state(status="disabled", op_status="failed", reason="kernel_wireguard_unavailable",
-                error="WireGuard is not available."))
+            state(status="disabled", op_status="failed", reason="kernel_wireguard_unavailable",
+                  error="WireGuard is not available."))
     api.add("POST", ENCRYPTION, {"id": 4, "status": "pending"}, status=202)
 
     result = run(module, cluster_id=7, mode="wireguard", acknowledge_workload_restart=True)
@@ -130,7 +130,7 @@ def test_wait_timeout_fails(api, run):
 
 def test_failed_running_change_is_not_automatically_retried(api, run):
     prepare(api, state(status="enabling", op_status="running"),
-          state(op_status="failed", reason="kernel_wireguard_unavailable", error="WireGuard unavailable."))
+            state(op_status="failed", reason="kernel_wireguard_unavailable", error="WireGuard unavailable."))
 
     result = run(module, cluster_id=7, mode="wireguard", acknowledge_workload_restart=True)
 
@@ -142,7 +142,7 @@ def test_failed_running_change_is_not_automatically_retried(api, run):
 
 def test_failed_operation_is_reported_even_if_mode_matches(api, run):
     prepare(api, state(), state(mode="wireguard", status="enabled", op_status="failed",
-                              reason="verification_failed", error="Verification failed."))
+                                reason="verification_failed", error="Verification failed."))
     api.add("POST", ENCRYPTION, {"id": 4, "status": "pending"}, status=202)
 
     result = run(module, cluster_id=7, mode="wireguard", acknowledge_workload_restart=True)
