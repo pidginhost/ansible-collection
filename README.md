@@ -105,13 +105,7 @@ Modules with a `wait` option (default `true`) return once the operation has fini
 servers, snapshots, buckets and Kubernetes clusters, running a task again while an earlier operation is still in progress waits for it instead of
 starting another one.
 
-Kubernetes worker pool tasks also wait for an existing cluster change before comparing the pool size.
-Load balancer upgrades poll the read-only upgrade plan until it reports `current`. If more work or blockers remain,
-the task fails on timeout; it does not start another upgrade while waiting. Use `wait: false` to submit one upgrade
-without waiting for convergence. Feature upgrades may still be queued when their wait ends, as documented in the module.
-
-Domain and kubeconfig request failures omit response bodies that may contain personal data or credentials.
-Kubeconfig results still contain credentials. Set `no_log: true` on tasks that read or use them.
+Kubeconfig and bucket credential results contain secrets. Set `no_log: true` on the tasks that read or use them.
 
 ## Example playbooks
 `playbooks/` holds one short playbook per module family. `playbooks/profile_info.yml` is a safe first run that only reads the account profile:

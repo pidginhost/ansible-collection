@@ -16,11 +16,6 @@
 - Requires ansible-core 2.16 or later and works with the latest Ansible release.
 
 ### Fixed
-- Kubernetes tasks wait for provisioning and report upgrades that fail to finish.
-- Worker pool removals report the outcome of the requested change.
-- Failed domain and cluster credential requests no longer expose sensitive response data.
-- DNS record lookups recognize internationalized names.
-- Rejected DNS replacements leave existing records intact.
 - The API token is no longer sent to another host when a request is redirected.
 - Reboots and package changes report success only once they have finished.
 - A failed task still reports the changes it made before the error.
