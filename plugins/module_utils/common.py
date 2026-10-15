@@ -97,6 +97,14 @@ def dns_record_name(name, zone):
     return "%s.%s." % (name, zone)
 
 
+def _retry_after(info):
+    """Seconds to wait before retrying a throttled request, from the Retry-After header."""
+    try:
+        return min(max(int(info.get("retry-after", POLL_INTERVAL)), 1), 60)
+    except (TypeError, ValueError):
+        return POLL_INTERVAL
+
+
 def _decode(raw):
     if not raw:
         return None
@@ -137,9 +145,19 @@ class PidginHostAPI(object):
             data = json.dumps(body)
             headers["Content-Type"] = "application/json"
 
-        resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method, timeout=self.timeout,
-                               unredirected_headers=["Authorization"])
-        status = self.status = info.get("status", -1)
+        deadline = None
+        while True:
+            resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method,
+                                   timeout=self.timeout, unredirected_headers=["Authorization"])
+            status = self.status = info.get("status", -1)
+            if status != 429:
+                break
+            # A throttled request was not processed, so any method can be sent again once the API allows it.
+            delay = _retry_after(info)
+            deadline = deadline or time.monotonic() + self.timeout
+            if time.monotonic() + delay > deadline:
+                break
+            time.sleep(delay)
         sensitive = sensitive or self.sensitive
         if status == -1:
             self.module.fail_json(changed=self.changed,

@@ -16,6 +16,7 @@
 - Requires ansible-core 2.16 or later and works with the latest Ansible release.
 
 ### Fixed
+- Modules wait and try again when the API asks them to slow down, instead of failing.
 - The API token is no longer sent to another host when a request is redirected.
 - Reboots and package changes report success only once they have finished.
 - A failed task still reports the changes it made before the error.

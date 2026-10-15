@@ -186,3 +186,23 @@ def test_sensitive_transport_errors_are_redacted(monkeypatch, make_module):
 
     assert exc.value.failed
     assert "private-key-sentinel" not in str(exc.value.result)
+
+
+def test_throttled_request_waits_and_retries(api, make_module, monkeypatch):
+    slept = []
+    monkeypatch.setattr("ansible_collections.pidginhost.cloud.plugins.module_utils.common.time.sleep", slept.append)
+    throttled = {"message": "Request was throttled. Expected available in 3 seconds."}
+    api.add("GET", SERVERS + "9/", throttled, status=429, headers={"retry-after": "3"})
+    api.add("GET", SERVERS + "9/", {"id": 9})
+
+    assert PidginHostAPI(make_module()).get(SERVERS + "9/") == {"id": 9}
+    assert slept == [3]
+
+
+def test_throttling_past_the_timeout_fails(api, make_module):
+    api.add("GET", SERVERS + "9/", {"message": "throttled"}, status=429, headers={"retry-after": "3"})
+
+    with pytest.raises(Exception) as exc:
+        PidginHostAPI(make_module(timeout=0)).get(SERVERS + "9/")
+
+    assert exc.value["status_code"] == 429

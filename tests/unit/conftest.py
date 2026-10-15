@@ -70,8 +70,8 @@ class FakeAPI:
         self.calls = []
         self.headers = []
 
-    def add(self, method, path, body=None, status=200):
-        self.routes.setdefault((method, path), []).append((status, body))
+    def add(self, method, path, body=None, status=200, headers=None):
+        self.routes.setdefault((method, path), []).append((status, body, headers or {}))
         return self
 
     def __call__(self, module, url, data=None, headers=None, method=None, timeout=None, **kwargs):
@@ -84,13 +84,13 @@ class FakeAPI:
         queue = self.routes.get((method, path))
         if not queue:
             raise AssertionError("unexpected API call: %s %s" % (method, path))
-        status, body = queue.pop(0) if len(queue) > 1 else queue[0]
+        status, body, extra = queue.pop(0) if len(queue) > 1 else queue[0]
         if status == -1:
             return None, {"status": -1, "msg": "Connection refused"}
         raw = b"" if body is None else to_bytes(json.dumps(body))
         if 200 <= status < 300:
-            return FakeResponse(raw), {"status": status}
-        return None, {"status": status, "body": raw, "msg": "HTTP Error %s" % status}
+            return FakeResponse(raw), dict(extra, status=status)
+        return None, dict(extra, status=status, body=raw, msg="HTTP Error %s" % status)
 
     def requests(self, method=None, path=None):
         return [
