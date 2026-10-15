@@ -27,9 +27,12 @@ def page(*items):
     return {"count": len(items), "next": None, "previous": None, "results": list(items)}
 
 
-def journal(journal_id, status, kind="downsize", message=""):
+def journal(journal_id, status, kind="downsize", message="", names=None, size=1):
+    if names is None:
+        names = ["w0", "w1"] if kind == "pool_delete" else ["w1"]
     return {"id": journal_id, "kind": kind, "status": status, "reason": "", "message": message,
-            "items": [], "allowed_actions": []}
+            "items": [{"target_hostname": name} for name in names], "allowed_actions": [],
+            "requested_pool_size": None if kind == "pool_delete" else size}
 
 
 def test_creates_pool_and_waits_for_cluster(api, run):
@@ -194,3 +197,63 @@ def test_upsize_fails_when_nodes_are_missing_after_the_change(api, run):
     assert result.failed
     assert result.changed
     assert "2 nodes instead of 3" in result["msg"]
+
+
+def test_removal_waits_for_its_own_journal_across_pages(api, run):
+    api.add("GET", CLUSTER, cluster())
+    api.add("GET", POOLS + "3/", pool())
+    api.add("GET", POOLS + "3/", pool(size=1))
+    api.add("GET", JOURNALS, page())
+    newer = journal(2, "succeeded", names=["other-worker"])
+    api.add("GET", JOURNALS, dict(page(newer), next="https://example.com/next"))
+    api.add("GET", JOURNALS + "?page=2", page(journal(1, "destructive")))
+    api.add("GET", JOURNALS + "?page=2", page(journal(1, "failed", message="Drain failed.")))
+    api.add("PATCH", POOLS + "3/", pool())
+
+    result = run(module, cluster_id=7, pool_id=3, size=1, local_data_loss_accepted=True)
+
+    assert result.failed
+    assert result.changed
+    assert result["journal"]["id"] == 1
+    assert "Drain failed" in result["msg"]
+    assert len(api.requests("GET", JOURNALS + "?page=2")) == 2
+
+
+def test_delete_does_not_accept_an_unrelated_successful_journal(api, run):
+    api.add("GET", CLUSTER, cluster())
+    api.add("GET", POOLS + "3/", pool())
+    api.add("GET", JOURNALS, page())
+    api.add("GET", JOURNALS, page(journal(1, "succeeded", kind="pool_delete", names=["other1", "other2"])))
+    api.add("DELETE", POOLS + "3/", status=204)
+
+    result = run(module, cluster_id=7, pool_id=3, state="absent", local_data_loss_accepted=True, timeout=0)
+
+    assert result.failed
+    assert result.changed
+    assert "in time" in result["msg"]
+
+
+def test_no_wait_does_not_read_journals_or_accept_data_loss(api, run):
+    api.add("GET", CLUSTER, cluster())
+    api.add("GET", POOLS + "3/", pool())
+    api.add("PATCH", POOLS + "3/", pool())
+
+    result = run(module, cluster_id=7, pool_id=3, size=1, wait=False)
+
+    assert not result.failed, result.result
+    assert api.writes() == [("PATCH", POOLS + "3/", {"new_size": 1, "local_data_loss_accepted": False})]
+    assert api.requests("GET", JOURNALS) == []
+
+
+def test_waits_for_existing_resize_and_does_not_resubmit(api, run):
+    api.add("GET", CLUSTER, cluster("upgrading"))
+    api.add("GET", CLUSTER, cluster("upgrading"))
+    api.add("GET", CLUSTER, cluster())
+    api.add("GET", POOLS + "3/", pool(size=3))
+
+    result = run(module, cluster_id=7, pool_id=3, size=3)
+
+    assert not result.failed, result.result
+    assert not result.changed
+    assert api.writes() == []
+    assert len(api.requests("GET", CLUSTER)) == 3

@@ -40,6 +40,7 @@ options:
     description:
       - Return only records with this name. A label relative to the zone such as V(www), V(@) or an empty string
         for the zone apex, or a fully qualified name.
+      - Internationalized names are converted to their ASCII DNS form.
     type: str
   type:
     description:

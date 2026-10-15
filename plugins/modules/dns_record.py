@@ -55,6 +55,7 @@ options:
     description:
       - Record name. A label relative to the zone such as V(www), V(@) or an empty string for the zone apex, or a
         fully qualified name such as V(www.example.com).
+      - Internationalized names are converted to their ASCII DNS form.
     type: str
     required: true
   type:
@@ -71,6 +72,7 @@ options:
   solo:
     description:
       - Delete every other record with the same O(name) and O(type).
+      - When the requested value is missing, replace the last matching record before deleting the others.
     type: bool
     default: false
   address:
@@ -119,7 +121,7 @@ options:
     type: str
   value:
     description:
-      - Value of a V(CAA) record, for example V(letsencrypt.org).
+      - Value of a V(CAA) record, for example V(ca.example.com).
     type: str
 """
 
@@ -274,9 +276,13 @@ def main():
         if rtype == "TXT":
             body["unencoded"] = "1"
         keep = next((r for r in found if str(r["ttl"]) == str(ttl)), found[0] if found else None)
+        if keep is None and params["solo"] and current:
+            # Replace before deleting anything. A rejected value must not wipe out the existing records.
+            keep = max(current, key=lambda r: r["Line"])
         add = keep is None
         # (line, add-record body to edit the record in place, or None to delete it)
-        ops = [(keep["Line"], dict(body, line=keep["Line"]))] if keep and str(keep["ttl"]) != str(ttl) else []
+        edit = keep and (not matches(keep) or str(keep["ttl"]) != str(ttl))
+        ops = [(keep["Line"], dict(body, line=keep["Line"]))] if edit else []
         if params["solo"]:
             ops.extend((r["Line"], None) for r in current if r is not keep)
     else:

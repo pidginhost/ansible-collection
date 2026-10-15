@@ -126,3 +126,27 @@ def test_wait_timeout_fails(api, run):
     assert result.failed
     assert result.changed
     assert "in time" in result["msg"]
+
+
+def test_failed_running_change_is_not_automatically_retried(api, run):
+    setup(api, state(status="enabling", op_status="running"),
+          state(op_status="failed", reason="kernel_wireguard_unavailable", error="WireGuard unavailable."))
+
+    result = run(module, cluster_id=7, mode="wireguard", acknowledge_workload_restart=True)
+
+    assert result.failed
+    assert not result.changed
+    assert "kernel_wireguard_unavailable" in result["msg"]
+    assert api.writes() == []
+
+
+def test_failed_operation_is_reported_even_if_mode_matches(api, run):
+    setup(api, state(), state(mode="wireguard", status="enabled", op_status="failed",
+                              reason="verification_failed", error="Verification failed."))
+    api.add("POST", ENCRYPTION, {"id": 4, "status": "pending"}, status=202)
+
+    result = run(module, cluster_id=7, mode="wireguard", acknowledge_workload_restart=True)
+
+    assert result.failed
+    assert result.changed
+    assert "verification_failed" in result["msg"]

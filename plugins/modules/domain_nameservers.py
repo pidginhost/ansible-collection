@@ -47,8 +47,8 @@ EXAMPLES = r"""
   pidginhost.cloud.domain_nameservers:
     domain: example.com
     nameservers:
-      - ns1.example.net
-      - ns2.example.net
+      - ns1.external.example.com
+      - ns2.external.example.com
 """
 
 RETURN = r"""
@@ -65,8 +65,8 @@ domain:
       tld: com
     expiration_date: "2027-01-31"
     nameservers:
-      - ns1.example.net
-      - ns2.example.net
+      - ns1.external.example.com
+      - ns2.external.example.com
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -88,7 +88,7 @@ def main():
 
     domain = fqdn(module.params["domain"])
     path = "/api/domain/domain/%s/" % domain
-    api = PidginHostAPI(module)
+    api = PidginHostAPI(module, sensitive=True)
     detail = api.get(path, allow_404=True)
     if not detail:
         module.fail_json(msg="Domain %s not found in the account." % domain)

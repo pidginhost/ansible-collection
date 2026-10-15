@@ -60,6 +60,8 @@ options:
     description:
       - Wait until the cluster is active with its features ready again, and fail if the upgrade fails.
       - Also wait for an upgrade that is already running before starting another one.
+      - For O(component=load_balancer), poll the read-only upgrade plan until it reports V(current).
+        Fail on timeout if further work or blockers remain. No additional upgrade is started while waiting.
       - The API does not report the progress of a feature upgrade that has not started yet, so for
         O(component=feature) the wait can end before the upgrade runs.
     type: bool
@@ -118,8 +120,8 @@ def settled(cluster):
 
 
 def wait_settled(api, module, cluster, changed):
-    # Kubernetes and Talos upgrades set the cluster to upgrading; feature and load balancer upgrades clear
-    # features_ready while they run.
+    # Kubernetes and Talos upgrades set the cluster to upgrading; feature tasks clear features_ready.
+    # Load balancer operations have their own plan polling because cluster state cannot track their jobs.
     path = "%s%s/" % (CLUSTERS, cluster["id"])
     done = api.wait_for(lambda: api.get(path), settled)
     if not done or done["status"] != "active":
@@ -136,17 +138,35 @@ def post_upgrade(api, module, path, body, nothing_to_do):
     response = api.post(path, body, allow_status=(400,))
     if api.status != 400:
         return True, response
-    fields = (response.get("extra") or {}).get("fields") or {}
-    if any(nothing_to_do in messages for messages in fields.values()):
+    extra = response.get("extra") if isinstance(response, dict) else None
+    fields = extra.get("fields") if isinstance(extra, dict) else None
+    messages = list(fields.values()) if isinstance(fields, dict) else []
+    if any(nothing_to_do in (value if isinstance(value, list) else [value]) for value in messages):
         return False, response
-    module.fail_json(msg="The upgrade was refused: %s" % (fields or response.get("message")),
+    module.fail_json(msg="The upgrade was refused: %s" % (fields or response),
                      status_code=400, response=response)
 
 
+def wait_load_balancer(api, module, path):
+    plans = []
+
+    def inspect():
+        plan = api.post(path, {"dry_run": True}, read_only=True)
+        plans[:] = [plan]
+        return plan
+
+    plan = api.wait_for(inspect, lambda p: p["convergence"] == "current")
+    if plan is None:
+        module.fail_json(changed=api.changed, msg="The load balancer did not reach current in time.",
+                         result=plans[-1])
+    return plan
+
+
 def upgrade_load_balancer(api, module, path):
-    plan = api.post(path, {"dry_run": True})
-    api.changed = False  # A dry run changes nothing.
+    plan = api.post(path, {"dry_run": True}, read_only=True)
     if plan["convergence"] in ("current", "operation_in_progress"):
+        if plan["convergence"] == "operation_in_progress" and module.params["wait"] and not module.check_mode:
+            plan = wait_load_balancer(api, module, path)
         return False, plan
     # A plan may carry blockers next to an executable level; the API decides with can_execute.
     if not plan["can_execute"]:
@@ -157,7 +177,10 @@ def upgrade_load_balancer(api, module, path):
         )
     if module.check_mode:
         return True, plan
-    return True, api.post(path, {"inspection_id": plan["inspection_id"]})
+    result = api.post(path, {"inspection_id": plan["inspection_id"]})
+    if module.params["wait"]:
+        wait_load_balancer(api, module, path)
+    return True, result
 
 
 def main():
@@ -201,7 +224,12 @@ def main():
                                        NO_FEATURE_UPGRADE)
 
     if changed and params["wait"] and not module.check_mode:
+        before = cluster
         cluster = wait_settled(api, module, cluster, changed=True)
+        version = {"kubernetes": "kube_version", "talos": "talos_version"}.get(component)
+        if version and (not cluster.get(version) or cluster[version] == before.get(version)):
+            module.fail_json(changed=True, msg="The %s upgrade did not change the installed version." % component,
+                             cluster=cluster)
     module.exit_json(changed=changed, cluster=cluster, result=result)
 
 

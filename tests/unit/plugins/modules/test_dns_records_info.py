@@ -12,7 +12,7 @@ RECORDS = "/api/freedns/dns/records/?domain=12&source=internal"
 APEX_A = {"Line": 13, "name": "example.com.", "ttl": 14400, "type": "A", "address": "192.0.2.10"}
 WWW_A = {"Line": 14, "name": "www.example.com.", "ttl": 14400, "type": "A", "address": "192.0.2.10"}
 WWW_CAA = {"Line": 15, "name": "www.example.com.", "ttl": 14400, "type": "TYPE257", "flag": 0, "tag": "issue",
-           "value": "ca.example.net"}
+           "value": "ca.external.example.com"}
 
 
 def test_lists_internal_zone_records_by_domain_id(api, run):
@@ -36,9 +36,9 @@ def test_filters_by_name_and_type(api, run):
 
 
 def test_external_zone_uses_domain_name(api, run):
-    api.add("GET", "/api/freedns/dns/records/?domain=example.net&source=external", [])
+    api.add("GET", "/api/freedns/dns/records/?domain=external.example.com&source=external", [])
 
-    result = run(dns_records_info, domain="example.net", source="external")
+    result = run(dns_records_info, domain="external.example.com", source="external")
 
     assert not result.failed, result.result
     assert result["records"] == []

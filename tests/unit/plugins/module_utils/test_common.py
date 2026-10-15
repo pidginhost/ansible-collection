@@ -163,3 +163,26 @@ def test_allowed_error_status_returns_body_without_failing(api, make_module):
     assert client.post(CLUSTERS + "4/kube-version-upgrade/", allow_status=(400,)) == refusal
     assert client.status == 400
     assert client.changed is False
+
+
+def test_read_only_post_preserves_prior_change_tracking(api, make_module):
+    path = CLUSTERS + "4/upgrade-lb/"
+    api.add("POST", path, {})
+    client = PidginHostAPI(make_module())
+
+    client.post(path, {"dry_run": True}, read_only=True)
+    assert not client.changed
+    client.post(path, {"inspection_id": "test"})
+    client.post(path, {"dry_run": True}, read_only=True)
+    assert client.changed
+
+
+def test_sensitive_transport_errors_are_redacted(monkeypatch, make_module):
+    monkeypatch.setattr("ansible_collections.pidginhost.cloud.plugins.module_utils.common.fetch_url",
+                        lambda *args, **kwargs: (None, {"status": -1, "msg": "private-key-sentinel"}))
+
+    with pytest.raises(Exception) as exc:
+        PidginHostAPI(make_module(), sensitive=True).get("/api/kubernetes/clusters/7/kubeconfig/")
+
+    assert exc.value.failed
+    assert "private-key-sentinel" not in str(exc.value.result)

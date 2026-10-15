@@ -64,7 +64,7 @@ domains:
       idna_name: example.com
       tld:
         tld: com
-      nameservers: ns1.example.net,ns2.example.net
+      nameservers: ns1.external.example.com,ns2.external.example.com
       expiration_date: "2027-01-31"
       service_status: Active
 """
@@ -83,7 +83,8 @@ def main():
         supports_check_mode=True,
     )
     params = module.params
-    domains = PidginHostAPI(module).list("/api/domain/domain/", **drop_none({"status_group": params["status_group"]}))
+    domains = PidginHostAPI(module, sensitive=True).list(
+        "/api/domain/domain/", **drop_none({"status_group": params["status_group"]}))
     if params["domain"]:
         domains = [d for d in domains if fqdn(d["idna_name"]) == fqdn(params["domain"])]
     for domain in domains:

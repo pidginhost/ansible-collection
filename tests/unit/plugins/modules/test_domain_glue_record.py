@@ -95,4 +95,5 @@ def test_registrar_error_fails(api, run):
     result = run(domain_glue_record, domain="example.com", name="ns1", ip="192.0.2.53")
 
     assert result.failed
-    assert "registry refused" in result["msg"]
+    assert result["status_code"] == 400
+    assert "response" not in result.result

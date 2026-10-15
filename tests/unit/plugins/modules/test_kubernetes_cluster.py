@@ -5,6 +5,8 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import pytest
+
 from ansible_collections.pidginhost.cloud.plugins.modules import kubernetes_cluster as module
 
 CLUSTERS = "/api/kubernetes/clusters/"
@@ -245,3 +247,52 @@ def test_absent_missing_cluster_is_ok(api, run):
 
     assert not result.failed
     assert not result.changed
+
+
+def test_existing_provisioning_cluster_is_awaited(api, run):
+    api.add("GET", CLUSTERS, page(cluster(status="provisioning")))
+    api.add("GET", CLUSTER, cluster(status="provisioning"))
+    api.add("GET", CLUSTER, cluster())
+
+    result = run(module, name="prod")
+
+    assert not result.failed, result.result
+    assert not result.changed
+    assert result["cluster"]["status"] == "active"
+    assert api.writes() == []
+    assert len(api.requests("GET", CLUSTER)) == 2
+
+
+@pytest.mark.parametrize("status", ["failed", "provisioning"])
+def test_existing_provisioning_failure_or_timeout_is_reported(api, run, status):
+    api.add("GET", CLUSTERS, page(cluster(status="provisioning")))
+    api.add("GET", CLUSTER, cluster(status=status))
+
+    result = run(module, name="prod", timeout=0)
+
+    assert result.failed
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_features_are_compared_again_after_waiting(api, run):
+    api.add("GET", CLUSTERS, page(cluster(features_ready=False)))
+    api.add("GET", CLUSTER, cluster(features_ready=True, features=[]))
+
+    result = run(module, name="prod", features=[])
+
+    assert not result.failed, result.result
+    assert not result.changed
+    assert result["cluster"]["features"] == []
+    assert api.writes() == []
+
+
+def test_provisioning_check_mode_does_not_wait_or_write(api, run):
+    api.add("GET", CLUSTERS, page(cluster(status="provisioning")))
+
+    result = run(module, check_mode=True, name="prod")
+
+    assert not result.failed, result.result
+    assert not result.changed
+    assert api.requests("GET", CLUSTER) == []
+    assert api.writes() == []

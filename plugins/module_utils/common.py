@@ -90,7 +90,8 @@ def dns_record_name(name, zone):
     if name in ("", "@"):
         return zone + "."
     if name.endswith("."):
-        return name
+        return fqdn(name) + "."
+    name = fqdn(name)
     if name == zone or name.endswith("." + zone):
         return name + "."
     return "%s.%s." % (name, zone)
@@ -107,8 +108,9 @@ def _decode(raw):
 
 
 class PidginHostAPI(object):
-    def __init__(self, module):
+    def __init__(self, module, sensitive=False):
         self.module = module
+        self.sensitive = sensitive
         self.timeout = module.params["timeout"]
         self.changed = False
         self.status = None
@@ -117,7 +119,8 @@ class PidginHostAPI(object):
             "Accept": "application/json",
         }
 
-    def request(self, method, path, body=None, query=None, allow_404=False, accept=None, allow_status=()):
+    def request(self, method, path, body=None, query=None, allow_404=False, accept=None, allow_status=(),
+                sensitive=False, read_only=False):
         """Send one API request and return the decoded body.
 
         A status in allow_status returns the decoded error body instead of failing; self.status holds the
@@ -137,16 +140,25 @@ class PidginHostAPI(object):
         resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method, timeout=self.timeout,
                                unredirected_headers=["Authorization"])
         status = self.status = info.get("status", -1)
+        sensitive = sensitive or self.sensitive
         if status == -1:
             self.module.fail_json(changed=self.changed,
-                                  msg="PidginHost API %s %s failed: %s" % (method, path, info.get("msg")))
+                                  msg="PidginHost API %s %s failed: %s" % (
+                                      method, path, "transport error" if sensitive else info.get("msg")))
         if allow_404 and status == 404:
             return None
         if 200 <= status < 300:
-            if method in ("POST", "PATCH", "DELETE"):
+            if method in ("POST", "PATCH", "DELETE") and not read_only:
                 self.changed = True
             body = _decode(resp.read() if resp else None)
             return {} if body is None else body
+        if sensitive:
+            self.module.fail_json(
+                changed=self.changed,
+                msg="PidginHost API %s %s returned HTTP %s; response omitted because it may contain sensitive data."
+                    % (method, path, status),
+                status_code=status,
+            )
         response = _decode(info.get("body"))
         if status in allow_status:
             return {} if response is None else response
@@ -245,7 +257,7 @@ class PidginHostAPI(object):
         """FreeDNS finds internal domains by their PidginHost ID and external domains by name."""
         if source == "external":
             return domain
-        found = self.get("/api/domain/domain/%s/" % domain, allow_404=True)
+        found = self.get("/api/domain/domain/%s/" % domain, allow_404=True, sensitive=True)
         if not found:
             self.module.fail_json(msg="Domain %s not found in the account." % domain)
         return found["id"]

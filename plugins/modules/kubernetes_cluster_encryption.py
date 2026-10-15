@@ -18,6 +18,7 @@ description:
   - Set the encryption mode of the pod traffic of a PidginHost Kubernetes cluster.
   - Nothing changes when the cluster already has O(mode) and no change is running, or when a running change already
     targets O(mode).
+  - A running change that fails while being awaited is reported as a failure and is not automatically retried.
   - The API refuses a change while another cluster operation runs, while the encryption state is unknown, and
     without O(acknowledge_workload_restart=true). The module fails with the reason the API gives.
   - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/kubernetes/kubernetes_clusters_encryption_create).
@@ -104,6 +105,11 @@ def wait_quiet(api, module, path, changed):
     state = api.wait_for(lambda: api.get(path), lambda s: not running(s))
     if state is None:
         module.fail_json(changed=changed, msg="The encryption change did not finish in time.")
+    operation = state.get("operation") or {}
+    if operation.get("status") == "failed":
+        module.fail_json(changed=changed, encryption=state, msg="The encryption change failed (%s): %s" % (
+            operation.get("reason") or state.get("reason") or "unknown",
+            operation.get("message") or state.get("error") or "no details"))
     return state
 
 

@@ -69,6 +69,7 @@ options:
   wait:
     description:
       - Wait until the cluster has finished the change.
+      - Wait for an existing cluster change before comparing the pool size.
       - For a shrink or the deletion of a pool with nodes, wait for the pool removal journal to succeed,
         and fail if it fails or needs attention.
     type: bool
@@ -135,17 +136,29 @@ def find_pool(api, module, pools_path):
 
 
 def last_journal_id(api, journals_path):
-    # The list is newest first.
-    items = api.get(journals_path).get("results") or [{"id": 0}]
-    return items[0]["id"]
+    return max([j["id"] for j in api.list(journals_path)] or [0])
 
 
 def wait_journal(api, module, journals_path, after, pool):
     """Wait for the removal journal created after journal id `after`."""
-    def newest():
-        return next((j for j in api.get(journals_path).get("results") or [] if j["id"] > after), None)
+    names = set(n["name"] for n in pool["nodes"])
+    deleting = module.params["state"] == "absent"
+    kind = "pool_delete" if deleting else "downsize"
+    size = 0 if deleting else module.params["size"]
 
-    journal = api.wait_for(newest, lambda j: j is not None and j["status"] in JOURNAL_DONE)
+    def matches(journal):
+        targets = set(item["target_hostname"] for item in journal["items"])
+        return (journal["id"] > after and journal["kind"] == kind
+                and journal["requested_pool_size"] == (None if deleting else size)
+                and len(targets) == len(names) - size and targets.issubset(names))
+
+    def requested_journal():
+        # The cluster can finish this change and start another before the next poll.
+        # Match the immutable worker snapshot, then keep following the first matching request.
+        journals = sorted(api.list(journals_path), key=lambda j: j["id"])
+        return next((j for j in journals if matches(j)), None)
+
+    journal = api.wait_for(requested_journal, lambda j: j is not None and j["status"] in JOURNAL_DONE)
     if not journal or journal["status"] != "succeeded":
         msg = "Removal of workers from pool %s did not finish in time." % pool["id"]
         if journal:
@@ -153,11 +166,11 @@ def wait_journal(api, module, journals_path, after, pool):
         module.fail_json(changed=True, msg=msg, journal=journal, resource_pool=pool)
 
 
-def wait_cluster(api, module, cluster_path, pool):
+def wait_cluster(api, module, cluster_path, pool, changed=True):
     cluster = api.wait_for(lambda: api.get(cluster_path), lambda c: c["status"] in ("active", "failed"))
     if not cluster or cluster["status"] != "active":
         reason = "failed" if cluster else "did not finish in time"
-        module.fail_json(changed=True, msg="The pool change on the cluster %s." % reason, resource_pool=pool)
+        module.fail_json(changed=changed, msg="The pool change on the cluster %s." % reason, resource_pool=pool)
 
 
 def changed_pool(api, module, pools_path, pool_id):
@@ -187,7 +200,10 @@ def main():
     )
     params = module.params
     api = PidginHostAPI(module)
-    cluster_path = "%s%s/" % (CLUSTERS, api.require_cluster(params["cluster_id"], params["cluster_name"])["id"])
+    cluster = api.require_cluster(params["cluster_id"], params["cluster_name"])
+    cluster_path = "%s%s/" % (CLUSTERS, cluster["id"])
+    if params["wait"] and not module.check_mode and cluster["status"] == "upgrading":
+        wait_cluster(api, module, cluster_path, {}, changed=False)
     pools_path = cluster_path + "resource-pools/"
     journals_path = cluster_path + "pool-removal-journals/"
     pool = find_pool(api, module, pools_path)
@@ -199,7 +215,7 @@ def main():
         if module.check_mode:
             module.exit_json(changed=True, resource_pool=pool)
         # A pool with nodes is removed through a journal; an empty one goes at once.
-        after = last_journal_id(api, journals_path) if pool["nodes"] else None
+        after = last_journal_id(api, journals_path) if pool["nodes"] and params["wait"] else None
         api.delete("%s%s/" % (pools_path, pool["id"]), body=ack)
         if params["wait"]:
             if after is None:
@@ -225,7 +241,7 @@ def main():
     if module.check_mode:
         module.exit_json(changed=True, resource_pool=pool)
     shrink = params["size"] < pool["size"]
-    after = last_journal_id(api, journals_path) if shrink else None
+    after = last_journal_id(api, journals_path) if shrink and params["wait"] else None
     api.patch("%s%s/" % (pools_path, pool["id"]), dict(ack, new_size=params["size"]))
     if params["wait"]:
         if shrink:

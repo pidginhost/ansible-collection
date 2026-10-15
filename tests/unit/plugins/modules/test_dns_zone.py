@@ -29,12 +29,12 @@ def test_activates_internal_zone_by_domain_id(api, run):
 
 def test_activates_external_zone_by_name(api, run):
     api.add("GET", ZONES, [])
-    api.add("POST", ACTIVATE, {"message": "ok", "domain": "example.net", "source": "external"})
+    api.add("POST", ACTIVATE, {"message": "ok", "domain": "external.example.com", "source": "external"})
 
-    result = run(dns_zone, domain="example.net.", source="external", ip="192.0.2.10")
+    result = run(dns_zone, domain="external.example.com.", source="external", ip="192.0.2.10")
 
     assert result.changed
-    assert api.writes() == [("POST", ACTIVATE, {"domain": "example.net", "source": "external", "ip": "192.0.2.10"})]
+    assert api.writes() == [("POST", ACTIVATE, {"domain": "external.example.com", "source": "external", "ip": "192.0.2.10"})]
 
 
 def test_active_zone_is_unchanged(api, run):

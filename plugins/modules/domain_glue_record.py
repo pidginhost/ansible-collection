@@ -112,7 +112,7 @@ def main():
     )
     params = module.params
     path = "/api/domain/domain/%s/dns/" % fqdn(params["domain"])
-    api = PidginHostAPI(module)
+    api = PidginHostAPI(module, sensitive=True)
     record = next((r for r in api.list(path) if r["name"].lower() == params["name"].lower()), None)
 
     if params["state"] == "absent":

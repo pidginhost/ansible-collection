@@ -62,7 +62,7 @@ EXAMPLES = r"""
 
 - name: Stop hosting an external domain
   pidginhost.cloud.dns_zone:
-    domain: example.net
+    domain: external.example.com
     source: external
     state: absent
 """

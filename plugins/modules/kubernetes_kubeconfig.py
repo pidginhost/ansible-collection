@@ -19,6 +19,7 @@ description:
   - With O(regenerate=true), generate a new kubeconfig and return it. This always reports a change.
   - The kubeconfig holds cluster admin credentials. Set C(no_log) on the task that registers the result and on any
     task that uses it.
+  - Failed requests report the HTTP status without the response body, which may contain credentials.
   - See U(https://www.pidginhost.com/api/schema/swagger-ui/#/kubernetes/kubernetes_clusters_kubeconfig_retrieve).
 
 author:
@@ -87,7 +88,7 @@ def main():
         supports_check_mode=True,
     )
     params = module.params
-    api = PidginHostAPI(module)
+    api = PidginHostAPI(module, sensitive=True)
     cluster = api.require_cluster(params["cluster_id"], params["cluster_name"])
     path = "%s%s/kubeconfig/" % (CLUSTERS, cluster["id"])
     # The endpoint only answers text/plain; GET reads the current file and POST replaces it.

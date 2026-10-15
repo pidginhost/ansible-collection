@@ -5,6 +5,8 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import pytest
+
 from ansible_collections.pidginhost.cloud.plugins.modules import kubernetes_kubeconfig as module
 
 CLUSTERS = "/api/kubernetes/clusters/"
@@ -61,3 +63,17 @@ def test_missing_cluster_fails(api, run):
 
     assert result.failed
     assert "not found" in result["msg"]
+
+
+@pytest.mark.parametrize("regenerate", [False, True])
+@pytest.mark.parametrize("body", ["client-key-data: private-key-sentinel", {"config": "private-key-sentinel"}])
+def test_error_never_returns_credential_body(api, run, regenerate, body):
+    api.add("GET", CLUSTER, {"id": 7, "name": "prod", "status": "active"})
+    api.add("POST" if regenerate else "GET", KUBECONFIG, body, status=502)
+
+    result = run(module, cluster_id=7, regenerate=regenerate)
+
+    assert result.failed
+    assert result["status_code"] == 502
+    assert "private-key-sentinel" not in str(result.result)
+    assert "response" not in result.result

@@ -12,7 +12,7 @@ DOMAINS = "/api/domain/domain/"
 
 def domain(label, tld="com"):
     return {"id": len(label), "domain": label, "tld": {"tld": tld}, "idna_name": "%s.%s" % (label, tld),
-            "nameservers": "ns1.example.net,ns2.example.net", "contacts": {"Registrant": {"email": "x@example.com"}}}
+            "nameservers": "ns1.external.example.com,ns2.external.example.com", "contacts": {"Registrant": {"email": "x@example.com"}}}
 
 
 def page(next_page, *items):
@@ -25,21 +25,21 @@ def without_contacts(item):
 
 def test_lists_every_page_without_contacts(api, run):
     api.add("GET", DOMAINS + "?status_group=current", page("https://example.com/next", domain("example")))
-    api.add("GET", DOMAINS + "?status_group=current&page=2", page(None, domain("example", "net")))
+    api.add("GET", DOMAINS + "?status_group=current&page=2", page(None, domain("external.example")))
 
     result = run(domains_info, check_mode=True, status_group="current")
 
     assert not result.failed, result.result
     assert not result.changed
-    assert result["domains"] == [without_contacts(domain("example")), without_contacts(domain("example", "net"))]
+    assert result["domains"] == [without_contacts(domain("example")), without_contacts(domain("external.example"))]
 
 
 def test_filters_by_domain(api, run):
-    api.add("GET", DOMAINS, page(None, domain("example"), domain("example", "net")))
+    api.add("GET", DOMAINS, page(None, domain("example"), domain("external.example")))
 
-    result = run(domains_info, domain="Example.NET.")
+    result = run(domains_info, domain="External.example.com.")
 
-    assert result["domains"] == [without_contacts(domain("example", "net"))]
+    assert result["domains"] == [without_contacts(domain("external.example"))]
 
 
 def test_api_error_fails(api, run):
@@ -48,3 +48,14 @@ def test_api_error_fails(api, run):
     result = run(domains_info)
 
     assert result.failed
+
+
+def test_error_response_never_returns_contact_data(api, run):
+    api.add("GET", DOMAINS, {"contacts": {"Registrant": {"email": "private-owner@example.com"}}}, status=500)
+
+    result = run(domains_info)
+
+    assert result.failed
+    assert result["status_code"] == 500
+    assert "private-owner" not in str(result.result)
+    assert "response" not in result.result

@@ -96,12 +96,12 @@ def test_caa_is_sent_as_type257_and_txt_as_unencoded(api, run):
     api.add("GET", RECORDS, zone())
     api.add("POST", ADD, {"message": "Record added successfully."}, status=201)
 
-    run(dns_record, domain="example.com", name="", type="CAA", flag=128, tag="issue", value="ca.example.net")
+    run(dns_record, domain="example.com", name="", type="CAA", flag=128, tag="issue", value="ca.external.example.com")
     run(dns_record, domain="example.com", name="_dmarc", type="TXT", txtdata="v=DMARC1; p=none")
 
     assert writes(api) == [
         (ADD, {"name": "example.com.", "ttl": 14400, "type": "TYPE257", "flag": 128, "tag": "issue",
-               "value": "ca.example.net"}),
+               "value": "ca.external.example.com"}),
         (ADD, {"name": "_dmarc.example.com.", "ttl": 14400, "type": "TXT", "txtdata": "v=DMARC1; p=none",
                "unencoded": "1"}),
     ]
@@ -193,10 +193,10 @@ def test_absent_missing_record_is_unchanged(api, run):
 
 
 def test_external_zone_uses_domain_name(api, run):
-    query = "?domain=example.net&source=external"
-    api.add("GET", "/api/freedns/dns/records/" + query, [rec(4, name="www.example.net.")])
+    query = "?domain=external.example.com&source=external"
+    api.add("GET", "/api/freedns/dns/records/" + query, [rec(4, name="www.external.example.com.")])
 
-    result = run(dns_record, domain="example.net", source="external", name="www", type="A", address="192.0.2.10")
+    result = run(dns_record, domain="external.example.com", source="external", name="www", type="A", address="192.0.2.10")
 
     assert not result.changed
 
@@ -210,3 +210,67 @@ def test_api_error_on_add_fails(api, run):
 
     assert result.failed
     assert "Error saving the record" in result["msg"]
+
+
+def test_internationalized_record_name_matches_ascii_form(api, run):
+    api.add("GET", DOMAIN, {"id": 12})
+    api.add("GET", RECORDS, zone(rec(4, name="xn--bcher-kva.example.com.")))
+
+    for name in (u"b\u00fccher", u"b\u00fccher.example.com", u"b\u00fccher.example.com."):
+        result = run(dns_record, domain="example.com", name=name, type="A", address="192.0.2.10")
+
+        assert not result.failed, result.result
+        assert not result.changed
+    assert api.writes() == []
+
+
+def test_internal_domain_lookup_does_not_leak_contact_errors(api, run):
+    api.add("GET", DOMAIN, {"contacts": {"Registrant": {"email": "private-owner@example.com"}}}, status=500)
+
+    result = run(dns_record, domain="example.com", name="www", type="A", address="192.0.2.10")
+
+    assert result.failed
+    assert "private-owner" not in str(result.result)
+    assert "response" not in result.result
+
+
+def test_solo_replaces_last_record_before_deleting_others(api, run):
+    api.add("GET", DOMAIN, {"id": 12})
+    api.add("GET", RECORDS, zone(rec(3, address="192.0.2.3"), rec(8, address="192.0.2.8")))
+    api.add("GET", RECORDS, zone(rec(7)))
+    api.add("POST", ADD, {"message": "Record saved successfully."})
+    api.add("POST", DELETE, {"message": "Record removed successfully."})
+
+    result = run(dns_record, domain="example.com", name="www", type="A", address="192.0.2.10", solo=True)
+
+    assert not result.failed, result.result
+    assert result.changed
+    assert writes(api) == [
+        (ADD, {"name": "www.example.com.", "ttl": 14400, "type": "A", "address": "192.0.2.10", "line": 8}),
+        (DELETE, {"line": 3}),
+    ]
+    assert result["record"] == rec(7)
+
+
+def test_solo_rejected_replacement_does_not_delete_existing_records(api, run):
+    api.add("GET", DOMAIN, {"id": 12})
+    api.add("GET", RECORDS, zone(rec(3, address="192.0.2.3"), rec(8, address="192.0.2.8")))
+    api.add("POST", ADD, {"message": "Invalid address."}, status=400)
+
+    result = run(dns_record, domain="example.com", name="www", type="A", address="invalid", solo=True)
+
+    assert result.failed
+    assert not result.changed
+    assert api.requests("POST", DELETE) == []
+
+
+def test_solo_replacement_check_mode_does_not_write(api, run):
+    api.add("GET", DOMAIN, {"id": 12})
+    api.add("GET", RECORDS, zone(rec(3, address="192.0.2.3")))
+
+    result = run(dns_record, check_mode=True, domain="example.com", name="www", type="A",
+                 address="192.0.2.10", solo=True)
+
+    assert not result.failed, result.result
+    assert result.changed
+    assert api.writes() == []

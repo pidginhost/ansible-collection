@@ -95,6 +95,7 @@ options:
   wait:
     description:
       - Wait until a new cluster is active, or until a deleted cluster is gone.
+      - Also wait for an existing cluster that is still provisioning before comparing its settings.
       - Also wait for C(features_ready) before changing O(features).
       - Provisioning a cluster can take longer than the default O(timeout).
     type: bool
@@ -194,6 +195,20 @@ def update(api, module, cluster):
     params = module.params
     if cluster["status"] in DELETING:
         module.fail_json(msg="Kubernetes cluster %s is being deleted." % cluster["id"], cluster=cluster)
+    path = cluster_path(cluster["id"])
+    if params["wait"] and not module.check_mode and cluster["status"] == "provisioning":
+        done = api.wait_for(lambda: api.get(path), lambda c: c["status"] != "provisioning")
+        if not done or done["status"] != "active":
+            module.fail_json(changed=False, msg="Kubernetes cluster %s did not become active." % cluster["id"],
+                             cluster=done or cluster)
+        cluster = done
+    if (params["features"] is not None and set(params["features"]) != set(cluster["features"] or [])
+            and not cluster["features_ready"] and params["wait"] and not module.check_mode):
+        done = api.wait_for(lambda: api.get(path), lambda c: c["features_ready"] or c["status"] == "failed")
+        if not done or not done["features_ready"]:
+            module.fail_json(msg="Kubernetes cluster %s features were not ready in time." % cluster["id"],
+                             cluster=done or cluster)
+        cluster = done
     changes = {}
     if params["features"] is not None and set(params["features"]) != set(cluster["features"] or []):
         changes["features"] = params["features"]
@@ -206,11 +221,6 @@ def update(api, module, cluster):
     if module.check_mode:
         module.exit_json(changed=True, cluster=cluster)
 
-    path = cluster_path(cluster["id"])
-    if "features" in changes and not cluster["features_ready"] and params["wait"]:
-        if not api.wait_for(lambda: api.get(path), lambda c: c["features_ready"]):
-            module.fail_json(msg="Kubernetes cluster %s features were not ready in time." % cluster["id"],
-                             cluster=cluster)
     module.exit_json(changed=True, cluster=api.patch(path, changes))
 
 
