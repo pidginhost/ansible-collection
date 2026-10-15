@@ -105,6 +105,10 @@ Modules with a `wait` option (default `true`) return once the operation has fini
 servers, snapshots, buckets and Kubernetes clusters, running a task again while an earlier operation is still in progress waits for it instead of
 starting another one.
 
+Throttled requests honor the API's retry delay within the remaining timeout. Requests and retries during an operation
+wait share that wait's timeout. Snapshot and rescue requests are resubmitted only after an explicit busy refusal;
+other reported failures stop the task.
+
 Kubeconfig and bucket credential results contain secrets. Set `no_log: true` on the tasks that read or use them.
 
 ## Example playbooks
@@ -121,14 +125,21 @@ ansible-test sanity --docker
 ansible-test units --docker
 ```
 
-Integration tests create, change and delete real resources, so run them against a dedicated CI account. Every resource
-they create is named `ansible-ci-...` and removed at the end of its target.
+Integration tests create, change and delete real resources, so run them against a dedicated CI account. Named resources
+use `ansible-ci-...`; private networks use the test subnets, and public IPs have no test label. Each target removes its
+resources when it finishes.
 ```bash
 cp tests/integration/integration_config.yml.template tests/integration/integration_config.yml   # add the token
 ansible-test integration --docker default pidginhost
 ansible-test integration --docker default --allow-disabled kubernetes   # slow, creates a billed cluster
 ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml   # remove leftovers
 ```
+
+Cleanup removes resources with the test prefix, the test private networks, and every unbound public IPv4 and IPv6
+address in the dedicated CI account. Addresses assigned to servers, including pending attachments, are kept. When
+`pidginhost_dns_domain` is set, cleanup also removes records with the test prefix from that zone. Cleanup continues
+with other resource types after a failure and fails at the end if anything could not be cleaned up. Use `--check`
+to preview it before running it manually.
 
 GitHub Actions runs sanity and unit tests on every pull request for ansible-core 2.16 to 2.21 and devel. Integration
 tests run on pushes to `main`, weekly, and on demand, using the `PIDGINHOST_CI_TOKEN` secret and the optional

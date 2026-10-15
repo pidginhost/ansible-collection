@@ -7,6 +7,7 @@ __metaclass__ = type
 
 import pytest
 
+from ansible_collections.pidginhost.cloud.plugins.module_utils import common
 from ansible_collections.pidginhost.cloud.plugins.module_utils.common import PidginHostAPI
 
 SERVERS = "/api/cloud/servers/"
@@ -206,3 +207,170 @@ def test_throttling_past_the_timeout_fails(api, make_module):
         PidginHostAPI(make_module(timeout=0)).get(SERVERS + "9/")
 
     assert exc.value["status_code"] == 429
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    class Clock:
+        now = 0.0
+
+        def sleep(self, seconds):
+            self.now += seconds
+
+    value = Clock()
+    monkeypatch.setattr(common.time, "monotonic", lambda: value.now)
+    monkeypatch.setattr(common.time, "sleep", value.sleep)
+    return value
+
+
+def test_retry_after_is_not_shortened(api, make_module, clock):
+    api.add("GET", SERVERS, status=429, headers={"retry-after": "120"})
+    api.add("GET", SERVERS, [])
+
+    assert PidginHostAPI(make_module()).get(SERVERS) == []
+    assert clock.now == 120
+
+
+def test_retry_after_accepts_http_date(api, make_module, clock, monkeypatch):
+    monkeypatch.setattr(common.time, "time", lambda: 1767225600 + clock.now)
+    api.add("GET", SERVERS, status=429, headers={"retry-after": "Thu, 01 Jan 2026 00:02:00 GMT"})
+    api.add("GET", SERVERS, [])
+
+    assert PidginHostAPI(make_module()).get(SERVERS) == []
+    assert clock.now == 120
+
+
+@pytest.mark.parametrize("delay", ["120", "9" * 400], ids=["long", "huge"])
+def test_retry_after_beyond_budget_does_not_resubmit(api, make_module, clock, delay):
+    api.add("POST", SERVERS, status=429, headers={"retry-after": delay})
+    api.add("POST", SERVERS, {"id": 9})
+
+    with pytest.raises(Exception) as exc:
+        PidginHostAPI(make_module(timeout=90)).post(SERVERS)
+
+    assert exc.value["status_code"] == 429
+    assert len(api.writes()) == 1
+
+
+def test_retry_budget_includes_request_time(api, make_module, clock, monkeypatch):
+    api.add("POST", SERVERS, status=429, headers={"retry-after": "3"})
+    api.add("POST", SERVERS, {"id": 9})
+
+    def slow_request(*args, **kwargs):
+        clock.now += 8
+        return api(*args, **kwargs)
+
+    monkeypatch.setattr(common, "fetch_url", slow_request)
+    with pytest.raises(Exception) as exc:
+        PidginHostAPI(make_module(timeout=10)).post(SERVERS)
+
+    assert exc.value["status_code"] == 429
+    assert len(api.writes()) == 1
+
+
+def test_retried_request_uses_remaining_timeout(api, make_module, clock, monkeypatch):
+    api.add("GET", SERVERS, status=429, headers={"retry-after": "3"})
+    api.add("GET", SERVERS, [])
+    timeouts = []
+
+    def request(*args, **kwargs):
+        timeouts.append(kwargs["timeout"])
+        return api(*args, **kwargs)
+
+    monkeypatch.setattr(common, "fetch_url", request)
+    assert PidginHostAPI(make_module(timeout=10)).get(SERVERS) == []
+    assert timeouts == [10, 7]
+
+
+@pytest.mark.parametrize("timeout", [0, 5])
+def test_busy_activity_never_resubmits_after_timeout(api, make_module, clock, timeout):
+    busy = {"date": "2026-01-01 12:00", "message": "Could not exit rescue mode: another server operation is in progress."}
+    if timeout:
+        api.add("GET", SERVERS + "9/activity/", {"logs": []})
+    api.add("GET", SERVERS + "9/activity/", {"logs": [busy]})
+    submits = []
+    client = PidginHostAPI(make_module(timeout=timeout))
+
+    with pytest.raises(Exception) as exc:
+        client.wait_activity(9, common.Counter(), ("Could not exit rescue mode",), lambda fresh: None,
+                             "Leaving rescue", resubmit=lambda: submits.append(clock.now))
+
+    assert exc.value.failed
+    assert submits == []
+
+
+def test_throttled_poll_cannot_extend_operation_timeout(api, make_module, clock):
+    api.add("GET", SERVERS, [])
+    api.add("GET", SERVERS, status=429, headers={"retry-after": "3"})
+    client = PidginHostAPI(make_module(timeout=7))
+
+    with pytest.raises(Exception) as exc:
+        client.wait_for(lambda: client.get(SERVERS), bool)
+
+    assert exc.value["status_code"] == 429
+    assert clock.now <= 7
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_terminal_activity_failure_wins_over_busy(api, make_module, clock, reverse):
+    messages = ["Could not exit rescue mode: another server operation is in progress.",
+                "Could not exit rescue mode: the disk could not start."]
+    logs = [{"date": "2026-01-01 12:00", "message": message} for message in messages]
+    api.add("GET", SERVERS + "9/activity/", {"logs": logs[::-1] if reverse else logs})
+    submits = []
+    client = PidginHostAPI(make_module(timeout=5))
+
+    with pytest.raises(Exception) as exc:
+        client.wait_activity(9, common.Counter(), ("Could not exit rescue mode",), lambda fresh: None,
+                             "Leaving rescue", resubmit=lambda: submits.append(clock.now))
+
+    assert exc.value.failed
+    assert "disk could not start" in exc.value["msg"]
+    assert submits == []
+
+
+def test_repeated_busy_refusals_are_resubmitted_at_intervals(api, make_module, clock):
+    busy = {"date": "2026-01-01 12:00", "message": "Could not exit rescue mode: another server operation is in progress."}
+    api.add("GET", SERVERS + "9/activity/", {"logs": [busy]})
+    # The API's timestamps can repeat, but each refusal must still be counted.
+    api.add("GET", SERVERS + "9/activity/", {"logs": [busy, busy]})
+    submits = []
+    client = PidginHostAPI(make_module(timeout=60))
+
+    result = client.wait_activity(
+        9, common.Counter(), ("Could not exit rescue mode",),
+        lambda fresh: "done" if len(submits) == 2 else None, "Leaving rescue",
+        resubmit=lambda: submits.append(clock.now))
+
+    assert result == "done"
+    assert submits == [0, 30]
+
+
+def test_busy_log_read_exhausting_timeout_does_not_resubmit(api, make_module, clock, monkeypatch):
+    busy = {"date": "2026-01-01 12:00", "message": "Could not exit rescue mode: another server operation is in progress."}
+    api.add("GET", SERVERS + "9/activity/", {"logs": [busy]})
+    submits = []
+
+    def slow_request(*args, **kwargs):
+        clock.now += 5
+        return api(*args, **kwargs)
+
+    monkeypatch.setattr(common, "fetch_url", slow_request)
+    client = PidginHostAPI(make_module(timeout=5))
+    with pytest.raises(Exception) as exc:
+        client.wait_activity(9, common.Counter(), ("Could not exit rescue mode",), lambda fresh: None,
+                             "Leaving rescue", resubmit=lambda: submits.append(clock.now))
+
+    assert exc.value.failed
+    assert submits == []
+
+
+def test_finished_wait_does_not_limit_later_requests(api, make_module, clock):
+    client = PidginHostAPI(make_module(timeout=10))
+    assert client.wait_for(lambda: None, bool) is None
+    assert clock.now == 10
+    api.add("GET", SERVERS, status=429, headers={"retry-after": "3"})
+    api.add("GET", SERVERS, [])
+
+    assert client.get(SERVERS) == []
+    assert clock.now == 13

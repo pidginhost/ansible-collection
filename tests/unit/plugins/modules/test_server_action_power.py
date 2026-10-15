@@ -191,8 +191,14 @@ def test_reboot_detects_new_boot_even_when_uptime_exceeds_initial_value(api, run
     usage = SERVERS + "42/usage/"
     api.add("GET", usage, {"status": "running", "uptime": 0})
     api.add("GET", usage, {"status": "running", "uptime": 1})
-    clock = iter([10, 10, 11, 11, 14])
-    monkeypatch.setattr(server_action_power.time, "monotonic", lambda: next(clock))
+    # Advance on polling sleeps, independently of how many times requests read the clock.
+    clock = [10]
+
+    def sleep(seconds):
+        clock[0] += seconds
+
+    monkeypatch.setattr(server_action_power.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(server_action_power.time, "sleep", sleep)
 
     result = run(server_action_power, server_id=42, state="reboot")
 

@@ -10,6 +10,8 @@ import ipaddress
 import json
 import time
 from collections import Counter
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from urllib.parse import urlencode
 
 from ansible.module_utils.basic import env_fallback
@@ -103,10 +105,17 @@ def dns_record_name(name, zone):
 
 def _retry_after(info):
     """Seconds to wait before retrying a throttled request, from the Retry-After header."""
+    value = info.get("retry-after", POLL_INTERVAL)
     try:
-        return min(max(int(info.get("retry-after", POLL_INTERVAL)), 1), 60)
+        return max(int(value), 1)
     except (TypeError, ValueError):
-        return POLL_INTERVAL
+        try:
+            date = parsedate_to_datetime(value)
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
+            return max(date.timestamp() - time.time(), 1)
+        except (TypeError, ValueError, OverflowError):
+            return POLL_INTERVAL
 
 
 def _decode(raw):
@@ -126,6 +135,7 @@ class PidginHostAPI(object):
         self.timeout = module.params["timeout"]
         self.changed = False
         self.status = None
+        self._wait_deadline = None
         self.headers = {
             "Authorization": "Token %s" % module.params["token"],
             "Accept": "application/json",
@@ -149,19 +159,22 @@ class PidginHostAPI(object):
             data = json.dumps(body)
             headers["Content-Type"] = "application/json"
 
-        deadline = None
+        deadline = time.monotonic() + self.timeout
+        if self._wait_deadline is not None:
+            deadline = min(deadline, self._wait_deadline)
         while True:
             resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method,
-                                   timeout=self.timeout, unredirected_headers=["Authorization"])
+                                   timeout=max(0, deadline - time.monotonic()), unredirected_headers=["Authorization"])
             status = self.status = info.get("status", -1)
             if status != 429:
                 break
             # A throttled request was not processed, so any method can be sent again once the API allows it.
             delay = _retry_after(info)
-            deadline = deadline or time.monotonic() + self.timeout
-            if time.monotonic() + delay > deadline:
+            if delay >= deadline - time.monotonic():
                 break
             time.sleep(delay)
+            if time.monotonic() >= deadline:
+                break
         sensitive = sensitive or self.sensitive
         if status == -1:
             self.module.fail_json(changed=self.changed,
@@ -219,14 +232,22 @@ class PidginHostAPI(object):
 
     def wait_for(self, fetch, ready):
         """Poll fetch() until ready(result) holds. Returns the result, or None on timeout."""
+        previous = self._wait_deadline
         deadline = time.monotonic() + self.timeout
-        while True:
-            obj = fetch()
-            if ready(obj):
-                return obj
-            if time.monotonic() >= deadline:
-                return None
-            time.sleep(POLL_INTERVAL)
+        self._wait_deadline = min(deadline, previous) if previous is not None else deadline
+        try:
+            while True:
+                obj = fetch()
+                if ready(obj):
+                    return obj
+                remaining = self._wait_deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+                time.sleep(min(POLL_INTERVAL, remaining))
+                if time.monotonic() >= self._wait_deadline:
+                    return None
+        finally:
+            self._wait_deadline = previous
 
     def find_one(self, items, kind, **match):
         found = [i for i in items if all(i.get(k) == v for k, v in match.items())]
@@ -257,15 +278,17 @@ class PidginHostAPI(object):
             current = Counter((entry["date"], entry["message"]) for entry in logs)
             counts = current - state["before"]
             fresh = [entry["message"] for entry in logs if counts[(entry["date"], entry["message"])]]
-            refused = next((m for m in fresh if m.startswith(tuple(refusals))), None)
-            if refused and resubmit and BUSY in refused:
-                if time.monotonic() >= state["next_try"]:
+            refused = [m for m in fresh if m.startswith(tuple(refusals))]
+            terminal = next((m for m in refused if not resubmit or BUSY not in m), None)
+            if terminal:
+                return False, terminal
+            if refused:
+                now = time.monotonic()
+                if state["next_try"] <= now < self._wait_deadline:
                     state["before"] = current
-                    state["next_try"] = time.monotonic() + RESUBMIT_DELAY
+                    state["next_try"] = now + RESUBMIT_DELAY
                     resubmit()
                 return None
-            if refused:
-                return False, refused
             value = finished(fresh)
             return None if value is None else (True, value)
 
