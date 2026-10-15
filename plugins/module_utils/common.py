@@ -50,6 +50,30 @@ def ip_version(address):
         return None
 
 
+def plan_rules(existing, desired, match_fields, update_fields, purge):
+    """Diff firewall-style rules.
+
+    Rules match one to one on match_fields, compared as strings with None equal to "".
+    Returns (rules to create, (rule id, changed fields) to patch, rules to delete).
+    """
+    def identity(rule):
+        return tuple("" if rule.get(k) is None else str(rule[k]) for k in match_fields)
+
+    unmatched = list(existing)
+    create, patch = [], []
+    for rule in desired:
+        match = next((r for r in unmatched if identity(r) == identity(rule)), None)
+        if match is None:
+            create.append(drop_none(rule))
+            continue
+        unmatched.remove(match)
+        changes = dict(
+            (k, rule[k]) for k in update_fields if rule.get(k) is not None and rule[k] != match.get(k))
+        if changes:
+            patch.append((match["id"], changes))
+    return create, patch, unmatched if purge else []
+
+
 def _decode(raw):
     if not raw:
         return None
@@ -70,11 +94,13 @@ class PidginHostAPI(object):
             "Accept": "application/json",
         }
 
-    def request(self, method, path, body=None, query=None, allow_404=False):
+    def request(self, method, path, body=None, query=None, allow_404=False, accept=None):
         url = BASE_URL + path
         if query:
             url += "?" + urlencode(query)
         headers = dict(self.headers)
+        if accept:
+            headers["Accept"] = accept
         data = None
         if body is not None:
             data = json.dumps(body)

@@ -127,3 +127,11 @@ def test_first_request_failure_does_not_claim_change(api, make_module):
 
     assert exc.value.failed
     assert not exc.value.changed
+
+
+def test_custom_accept_returns_text(api, make_module):
+    api.add("GET", "/api/kubernetes/clusters/7/kubeconfig/", "apiVersion: v1\n")
+
+    client = PidginHostAPI(make_module())
+    assert client.get("/api/kubernetes/clusters/7/kubeconfig/", accept="text/plain") == "apiVersion: v1\n"
+    assert api.headers[-1]["Accept"] == "text/plain"
