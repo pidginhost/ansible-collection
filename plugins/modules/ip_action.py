@@ -125,9 +125,11 @@ def main():
     if not ip:
         module.fail_json(msg="IP address %s is not in your account." % params["ip_address"])
 
+    # "attached" flips only once the network change is applied; server_id already names the server before that.
+    bound = ip["attached"] or ip["server_id"] is not None
     if params["state"] == "present":
         server = api.require_server(params["server_id"], params["server_hostname"])
-        if ip["attached"]:
+        if bound:
             if ip["server_id"] != server["id"]:
                 module.fail_json(msg="IP address %s is attached to another server (%s); detach it first."
                                      % (ip["address"], ip["server"] or ip["server_id"]), ip=ip)
@@ -137,7 +139,7 @@ def main():
         result = api.post("%s%s/attach-ipv%d/" % (SERVERS, server["id"], version),
                           {"ipv%d" % version: ip["address"], "reboot": params["reboot"]})
     else:
-        if not ip["attached"]:
+        if not bound:
             module.exit_json(changed=False, ip_result={}, ip=ip)
         target_id = params["server_id"]
         if target_id is None and params["server_hostname"]:
