@@ -21,13 +21,13 @@ def forward(**kw):
     return base
 
 
-def setup(api, *forwards):
+def prepare(api, *forwards):
     api.add("GET", CLUSTER, {"id": 7, "name": "prod", "status": "active"})
     api.add("GET", FORWARDS, page(*forwards))
 
 
 def test_creates_forward(api, run):
-    setup(api, forward(protocol="udp"))
+    prepare(api, forward(protocol="udp"))
     api.add("POST", FORWARDS, forward(id=3), status=201)
 
     result = run(module, cluster_id=7, port=8080, protocol="tcp", internal_ip="192.0.2.20")
@@ -39,7 +39,7 @@ def test_creates_forward(api, run):
 
 
 def test_matching_forward_is_unchanged(api, run):
-    setup(api, forward())
+    prepare(api, forward())
 
     result = run(module, cluster_id=7, port=8080, protocol="tcp", internal_ip="192.0.2.20")
 
@@ -49,7 +49,7 @@ def test_matching_forward_is_unchanged(api, run):
 
 
 def test_changed_internal_ip_is_patched(api, run):
-    setup(api, forward())
+    prepare(api, forward())
     api.add("PATCH", FORWARDS + "2/", forward(internal_ip="192.0.2.21"))
 
     result = run(module, cluster_id=7, port=8080, protocol="tcp", internal_ip="192.0.2.21")
@@ -61,7 +61,7 @@ def test_changed_internal_ip_is_patched(api, run):
 
 
 def test_forward_is_deleted(api, run):
-    setup(api, forward())
+    prepare(api, forward())
     api.add("DELETE", FORWARDS + "2/", None, status=204)
 
     result = run(module, cluster_id=7, port=8080, protocol="tcp", state="absent")
@@ -72,7 +72,7 @@ def test_forward_is_deleted(api, run):
 
 
 def test_missing_forward_is_unchanged_when_absent(api, run):
-    setup(api, forward(protocol="udp"))
+    prepare(api, forward(protocol="udp"))
 
     result = run(module, cluster_id=7, port=8080, protocol="tcp", state="absent")
 
@@ -81,7 +81,7 @@ def test_missing_forward_is_unchanged_when_absent(api, run):
 
 
 def test_check_mode_makes_no_writes(api, run):
-    setup(api, forward())
+    prepare(api, forward())
 
     created = run(module, check_mode=True, cluster_id=7, port=9090, protocol="tcp", internal_ip="192.0.2.20")
     changed = run(module, check_mode=True, cluster_id=7, port=8080, protocol="tcp", internal_ip="192.0.2.21")
@@ -92,7 +92,7 @@ def test_check_mode_makes_no_writes(api, run):
 
 
 def test_create_requires_internal_ip(api, run):
-    setup(api)
+    prepare(api)
 
     result = run(module, cluster_id=7, port=8080, protocol="tcp")
 

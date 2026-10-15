@@ -15,13 +15,13 @@ DB = {"id": 42, "hostname": "db1.example.com"}
 DB_CONNECTED = dict(DB, ip="192.0.2.100")
 
 
-def setup(api, *connected):
+def prepare(api, *connected):
     api.add("GET", CLUSTER, {"id": 7, "name": "prod", "status": "active"})
     api.add("GET", CONNECTED, {"vms": list(connected)})
 
 
 def test_connects_server_by_hostname_and_waits(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", CONNECTED, {"vms": []})
     api.add("GET", CONNECTED, {"vms": [DB_CONNECTED]})
     api.add("GET", ELIGIBLE, {"vms": [{"id": 41, "hostname": "web1.example.com"}, DB]})
@@ -36,7 +36,7 @@ def test_connects_server_by_hostname_and_waits(api, run):
 
 
 def test_connected_server_is_unchanged(api, run):
-    setup(api, DB_CONNECTED)
+    prepare(api, DB_CONNECTED)
 
     result = run(module, cluster_id=7, server_id=42)
 
@@ -47,7 +47,7 @@ def test_connected_server_is_unchanged(api, run):
 
 
 def test_ineligible_server_fails_with_access_hint(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", ELIGIBLE, {"vms": []})
 
     result = run(module, cluster_id=7, server_id=42)
@@ -58,7 +58,7 @@ def test_ineligible_server_fails_with_access_hint(api, run):
 
 
 def test_disconnects_server_and_waits(api, run):
-    setup(api, DB_CONNECTED)
+    prepare(api, DB_CONNECTED)
     api.add("GET", CONNECTED, {"vms": [DB_CONNECTED]})
     api.add("GET", CONNECTED, {"vms": []})
     api.add("POST", CLUSTER + "disconnect-vm/", {"status": "OK", "message": "VM disconnection initiated."})
@@ -72,7 +72,7 @@ def test_disconnects_server_and_waits(api, run):
 
 
 def test_disconnected_server_is_unchanged_when_absent(api, run):
-    setup(api)
+    prepare(api)
 
     result = run(module, cluster_id=7, server_hostname="db1.example.com", state="absent")
 
@@ -81,7 +81,7 @@ def test_disconnected_server_is_unchanged_when_absent(api, run):
 
 
 def test_check_mode_makes_no_writes(api, run):
-    setup(api, DB_CONNECTED)
+    prepare(api, DB_CONNECTED)
     api.add("GET", ELIGIBLE, {"vms": [{"id": 41, "hostname": "web1.example.com"}]})
 
     connected = run(module, check_mode=True, cluster_id=7, server_id=41)

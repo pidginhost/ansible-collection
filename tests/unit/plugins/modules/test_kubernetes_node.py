@@ -26,13 +26,13 @@ def op(status, kind="reboot", **kw):
     return base
 
 
-def setup(api):
+def prepare(api):
     api.add("GET", CLUSTER, {"id": 7, "name": "prod", "status": "active"})
     api.add("GET", NODES, page(NODE))
 
 
 def test_reboot_waits_until_succeeded(api, run):
-    setup(api)
+    prepare(api)
     api.add("POST", NODES + "11/reboot/", op("pending"), status=202)
     api.add("GET", OPS + "9/", op("draining"))
     api.add("GET", OPS + "9/", op("succeeded"))
@@ -46,7 +46,7 @@ def test_reboot_waits_until_succeeded(api, run):
 
 
 def test_delete_by_id_confirms_hostname(api, run):
-    setup(api)
+    prepare(api)
     api.add("DELETE", NODES + "11/", op("pending", kind="delete"), status=202)
 
     result = run(module, cluster_id=7, pool_id=3, node="11", state="absent", wait=False)
@@ -59,7 +59,7 @@ def test_delete_by_id_confirms_hostname(api, run):
 
 
 def test_missing_node_is_unchanged_when_absent(api, run):
-    setup(api)
+    prepare(api)
 
     result = run(module, cluster_id=7, pool_id=3, node="prod-w9", state="absent")
 
@@ -70,7 +70,7 @@ def test_missing_node_is_unchanged_when_absent(api, run):
 
 
 def test_check_mode_makes_no_writes(api, run):
-    setup(api)
+    prepare(api)
 
     rebooted = run(module, check_mode=True, cluster_id=7, pool_id=3, node="prod-w1", state="rebooted")
     deleted = run(module, check_mode=True, cluster_id=7, pool_id=3, node="prod-w1", state="absent")
@@ -80,7 +80,7 @@ def test_check_mode_makes_no_writes(api, run):
 
 
 def test_blocked_operation_fails_with_reason_and_actions(api, run):
-    setup(api)
+    prepare(api)
     api.add("POST", NODES + "11/reboot/", op("pending"), status=202)
     api.add("GET", OPS + "9/", op("blocked", reason="pdb_blocked", message="A PodDisruptionBudget blocks the drain.",
                                   allowed_actions=["retry", "cancel"]))
@@ -96,7 +96,7 @@ def test_blocked_operation_fails_with_reason_and_actions(api, run):
 
 
 def test_reboot_of_missing_node_fails(api, run):
-    setup(api)
+    prepare(api)
 
     result = run(module, cluster_id=7, pool_id=3, node="prod-w9", state="rebooted")
 

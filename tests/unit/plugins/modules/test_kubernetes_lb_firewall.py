@@ -25,13 +25,13 @@ def rule(rule_id, **kw):
 HTTPS = {"direction": "in", "action": "ACCEPT", "protocol": "tcp", "dport": "443"}
 
 
-def setup(api, *rules):
+def prepare(api, *rules):
     api.add("GET", CLUSTER, {"id": 7, "name": "prod", "status": "active"})
     api.add("GET", RULES, page(*rules))
 
 
 def test_creates_missing_rule(api, run):
-    setup(api)
+    prepare(api)
     api.add("POST", RULES, rule(1, comment="web"), status=201)
     api.add("GET", RULES, page(rule(1, comment="web")))
 
@@ -46,7 +46,7 @@ def test_creates_missing_rule(api, run):
 
 
 def test_matching_rules_are_unchanged(api, run):
-    setup(api, rule(1), rule(2, dport="22", source="203.0.113.0/24"))
+    prepare(api, rule(1), rule(2, dport="22", source="203.0.113.0/24"))
 
     result = run(module, cluster_id=7, rules=[HTTPS])
 
@@ -57,7 +57,7 @@ def test_matching_rules_are_unchanged(api, run):
 
 
 def test_changed_comment_enabled_and_position_are_patched(api, run):
-    setup(api, rule(1))
+    prepare(api, rule(1))
     api.add("PATCH", RULES + "1/", rule(1, comment="web", enabled=False, position=5))
     api.add("GET", RULES, page(rule(1, comment="web", enabled=False, position=5)))
 
@@ -69,7 +69,7 @@ def test_changed_comment_enabled_and_position_are_patched(api, run):
 
 
 def test_purge_deletes_unlisted_rules(api, run):
-    setup(api, rule(1), rule(2, dport="22"))
+    prepare(api, rule(1), rule(2, dport="22"))
     api.add("DELETE", RULES + "2/", None, status=204)
     api.add("GET", RULES, page(rule(1)))
 
@@ -82,7 +82,7 @@ def test_purge_deletes_unlisted_rules(api, run):
 
 
 def test_check_mode_makes_no_writes(api, run):
-    setup(api, rule(2, dport="22"))
+    prepare(api, rule(2, dport="22"))
 
     result = run(module, check_mode=True, cluster_id=7, rules=[HTTPS], purge_rules=True)
 

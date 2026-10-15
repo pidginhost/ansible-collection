@@ -36,12 +36,12 @@ PLATFORM = port_route(id=1, name="kube-apiserver", namespace="envoy-gw", port=0,
                       backend_service_name="kube-apiserver", backend_service_port=6443)
 
 
-def setup(api):
+def prepare(api):
     api.add("GET", CLUSTER, {"id": 7, "name": "prod", "status": "active"})
 
 
 def test_http_route_is_created(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", HTTP, page())
     api.add("POST", HTTP, http_route(), status=201)
 
@@ -57,7 +57,7 @@ def test_http_route_is_created(api, run):
 
 
 def test_http_route_with_reordered_hostnames_is_unchanged(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", HTTP, page(http_route(), http_route(id=6, namespace="shop")))
 
     result = run(module, cluster_id=7, protocol="http", name="web", hostnames=["www.example.com", "example.com"],
@@ -70,7 +70,7 @@ def test_http_route_with_reordered_hostnames_is_unchanged(api, run):
 
 
 def test_http_route_patches_only_changed_fields(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", HTTP, page(http_route()))
     api.add("PATCH", HTTP + "4/", http_route(hostnames=["shop.example.com"], backend_service_port=8080))
 
@@ -84,7 +84,7 @@ def test_http_route_patches_only_changed_fields(api, run):
 
 
 def test_tcp_route_is_created_beside_platform_route(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", TCP, page(PLATFORM))
     api.add("POST", TCP, port_route(), status=201)
 
@@ -99,7 +99,7 @@ def test_tcp_route_is_created_beside_platform_route(api, run):
 
 
 def test_udp_route_port_is_patched(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", UDP, page(port_route(namespace="infra")))
     api.add("PATCH", UDP + "5/", port_route(namespace="infra", port=5354))
 
@@ -113,7 +113,7 @@ def test_udp_route_port_is_patched(api, run):
 
 
 def test_route_is_deleted(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", TCP, page(PLATFORM, port_route()))
     api.add("DELETE", TCP + "5/", None, status=204)
 
@@ -126,7 +126,7 @@ def test_route_is_deleted(api, run):
 
 
 def test_missing_route_is_unchanged_when_absent(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", TCP, page(PLATFORM))
 
     result = run(module, cluster_id=7, protocol="tcp", name="dns", state="absent")
@@ -137,7 +137,7 @@ def test_missing_route_is_unchanged_when_absent(api, run):
 
 
 def test_check_mode_makes_no_writes(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", HTTP, page(http_route()))
 
     created = run(module, check_mode=True, cluster_id=7, protocol="http", name="api", hostnames=["example.com"],
@@ -159,7 +159,7 @@ def test_options_of_another_protocol_fail(api, run):
 
 
 def test_create_requires_backend_and_port(api, run):
-    setup(api)
+    prepare(api)
     api.add("GET", UDP, page())
 
     result = run(module, cluster_id=7, protocol="udp", name="dns", backend_service_name="dns")
