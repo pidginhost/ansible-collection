@@ -90,12 +90,18 @@ class PidginHostAPI(object):
         self.module = module
         self.timeout = module.params["timeout"]
         self.changed = False
+        self.status = None
         self.headers = {
             "Authorization": "Token %s" % module.params["token"],
             "Accept": "application/json",
         }
 
-    def request(self, method, path, body=None, query=None, allow_404=False, accept=None):
+    def request(self, method, path, body=None, query=None, allow_404=False, accept=None, allow_status=()):
+        """Send one API request and return the decoded body.
+
+        A status in allow_status returns the decoded error body instead of failing; self.status holds the
+        status of the last response either way.
+        """
         url = BASE_URL + path
         if query:
             url += "?" + urlencode(query)
@@ -109,7 +115,7 @@ class PidginHostAPI(object):
 
         resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method, timeout=self.timeout,
                                unredirected_headers=["Authorization"])
-        status = info.get("status", -1)
+        status = self.status = info.get("status", -1)
         if status == -1:
             self.module.fail_json(changed=self.changed,
                                   msg="PidginHost API %s %s failed: %s" % (method, path, info.get("msg")))
@@ -121,6 +127,8 @@ class PidginHostAPI(object):
             body = _decode(resp.read() if resp else None)
             return {} if body is None else body
         response = _decode(info.get("body"))
+        if status in allow_status:
+            return {} if response is None else response
         self.module.fail_json(
             changed=self.changed,
             msg="PidginHost API %s %s returned HTTP %s: %s" % (method, path, status, response or info.get("msg")),

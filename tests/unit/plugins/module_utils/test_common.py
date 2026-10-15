@@ -153,3 +153,13 @@ def test_require_cluster_by_id_fails_when_missing(api, make_module):
         PidginHostAPI(make_module()).require_cluster(cluster_id=9)
 
     assert "not found" in exc.value["msg"]
+
+
+def test_allowed_error_status_returns_body_without_failing(api, make_module):
+    refusal = {"message": "Validation error", "extra": {"fields": {"non_field_errors": ["latest"]}}}
+    api.add("POST", CLUSTERS + "4/kube-version-upgrade/", refusal, status=400)
+
+    client = PidginHostAPI(make_module())
+    assert client.post(CLUSTERS + "4/kube-version-upgrade/", allow_status=(400,)) == refusal
+    assert client.status == 400
+    assert client.changed is False
