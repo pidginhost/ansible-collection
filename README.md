@@ -2,7 +2,7 @@
 
 ![PidginHost + Ansible](ph+an.png)
 
-The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys, object storage buckets and DNS. It also ships a dynamic inventory plugin and example playbooks.
+The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys, object storage buckets, DNS and Kubernetes clusters. It also ships a dynamic inventory plugin and example playbooks.
 
 Every module supports check mode and makes no changes in it. Tasks leave resources that already match unchanged. Rebooting,
 rolling back a snapshot, rotating bucket keys and allocating an IP without an address always make a change.
@@ -66,6 +66,17 @@ Run `ansible-doc pidginhost.cloud.<module>` for options and examples.
 | | `domain_nameservers` | Set the nameservers of a registered domain. |
 | | `domain_glue_record` | Manage child nameserver hosts registered for a domain. |
 | | `domains_info` | List registered domains. |
+| Kubernetes | `kubernetes_cluster` | Create, update or delete a cluster: features, protection, worker package and size. |
+| | `kubernetes_cluster_upgrade` | Upgrade Kubernetes, Talos, a feature or the load balancer. |
+| | `kubernetes_cluster_encryption` | Turn WireGuard encryption of cluster traffic on or off. |
+| | `kubernetes_kubeconfig` | Read or regenerate the kubeconfig. |
+| | `kubernetes_resource_pool` | Create, resize or delete a worker pool. |
+| | `kubernetes_node` | Reboot or remove one worker node. |
+| | `kubernetes_route` | Expose a service through an HTTP, TCP or UDP route. |
+| | `kubernetes_port_forward` | Forward a load balancer port to an internal address. |
+| | `kubernetes_lb_firewall` | Manage the load balancer firewall rules. |
+| | `kubernetes_cluster_vm` | Connect a cloud server to the cluster network or disconnect it. |
+| | `kubernetes_clusters_info`, `kubernetes_cluster_types_info` | List clusters with their pools, routes and other settings, and the cluster types. |
 
 All modules belong to the `pidginhost.cloud.all` action group, so the token can be set once:
 ```yaml
@@ -91,7 +102,7 @@ Each host gets the server attributes as variables and `ansible_user` set to the 
 
 ## Waiting for changes
 Modules with a `wait` option (default `true`) return once the operation has finished, or fail after `timeout` seconds. For
-servers, snapshots and buckets, running a task again while an earlier operation is still in progress waits for it instead of
+servers, snapshots, buckets and Kubernetes clusters, running a task again while an earlier operation is still in progress waits for it instead of
 starting another one.
 
 ## Example playbooks

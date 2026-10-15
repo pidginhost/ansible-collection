@@ -22,6 +22,18 @@ action_groups:
     - ip
     - ip_action
     - ips_info
+    - kubernetes_cluster
+    - kubernetes_cluster_encryption
+    - kubernetes_cluster_types_info
+    - kubernetes_cluster_upgrade
+    - kubernetes_cluster_vm
+    - kubernetes_clusters_info
+    - kubernetes_kubeconfig
+    - kubernetes_lb_firewall
+    - kubernetes_node
+    - kubernetes_port_forward
+    - kubernetes_resource_pool
+    - kubernetes_route
     - packages_info
     - private_network
     - private_network_server
