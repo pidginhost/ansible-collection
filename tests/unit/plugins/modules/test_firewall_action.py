@@ -88,3 +88,16 @@ def test_requires_a_server(api, run):
 
     assert result.failed
     assert api.calls == []
+
+
+def test_locked_firewall_fails_instead_of_reporting_a_change(api, run):
+    # Free tier servers keep the platform rules set whatever the request says.
+    by_hostname(api)
+    api.add("GET", IFACE, interface(fw_rules_set="free tier fw"))
+    api.add("POST", IFACE, interface(fw_rules_set="free tier fw"))
+
+    result = run(firewall_action, server_hostname="web1.example.com", rules_set_name="web")
+
+    assert result.failed
+    assert not result.changed
+    assert "free tier fw" in result["msg"]

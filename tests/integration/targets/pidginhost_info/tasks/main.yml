@@ -1,0 +1,102 @@
+---
+- name: Read-only modules return lists and change nothing
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+  block:
+    - name: Account profile
+      pidginhost.cloud.profile_info:
+      register: profile
+
+    - name: Catalog
+      pidginhost.cloud.images_info:
+      register: images
+
+    - name: Packages
+      pidginhost.cloud.packages_info:
+      register: packages
+
+    - name: Generations
+      pidginhost.cloud.generations_info:
+      register: generations
+
+    - name: Packages of the first generation
+      pidginhost.cloud.packages_info:
+        generation: "{{ generations.generations[0].slug }}"
+      register: generation_packages
+
+    - name: Storage products
+      pidginhost.cloud.volumes_products_info:
+      register: storage
+
+    - name: Account resources
+      pidginhost.cloud.servers_info:
+      register: servers
+
+    - name: Volumes
+      pidginhost.cloud.volumes_info:
+      register: volumes
+
+    - name: IPv4 addresses
+      pidginhost.cloud.ips_info:
+        ip_type: ipv4
+      register: ipv4
+
+    - name: Floating IPs
+      pidginhost.cloud.floating_ips_info:
+      register: floating
+
+    - name: Private networks
+      pidginhost.cloud.private_networks_info:
+      register: networks
+
+    - name: Firewalls
+      pidginhost.cloud.firewalls_info:
+      register: firewalls
+
+    - name: SSH keys
+      pidginhost.cloud.ssh_keys_info:
+      register: keys
+
+    - name: Buckets
+      pidginhost.cloud.buckets_info:
+      register: buckets
+
+    - name: FreeDNS zones
+      pidginhost.cloud.dns_zones_info:
+      register: zones
+
+    - name: Domains
+      pidginhost.cloud.domains_info:
+      register: domains
+
+    - name: Kubernetes cluster types
+      pidginhost.cloud.kubernetes_cluster_types_info:
+      register: cluster_types
+
+    - name: Kubernetes clusters
+      pidginhost.cloud.kubernetes_clusters_info:
+      register: clusters
+
+    - name: Every info module returns its list and reports no change
+      ansible.builtin.assert:
+        that:
+          - profile.account is mapping
+          - images.images | length > 0
+          - packages.packages | length > 0
+          - generations.generations | length > 0
+          - generation_packages.packages | length > 0
+          - storage.volumes | length > 0
+          - cluster_types.cluster_types | length > 0
+          - servers.servers is sequence
+          - volumes.volumes is sequence
+          - ipv4.ips is sequence
+          - floating.floating_ips is sequence
+          - networks.private_networks is sequence
+          - firewalls.firewalls is sequence
+          - keys.ssh_keys is sequence
+          - buckets.buckets is sequence
+          - zones.zones is sequence
+          - clusters.clusters is sequence
+          - domains.domains | selectattr('contacts', 'defined') | list | length == 0
+          - not (profile.changed or images.changed or servers.changed or clusters.changed or domains.changed)

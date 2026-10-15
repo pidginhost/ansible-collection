@@ -1,0 +1,11 @@
+---
+- name: Require a CI API token
+  ansible.builtin.assert:
+    that: pidginhost_token | default('') | length > 0
+    fail_msg: Set pidginhost_token in tests/integration/integration_config.yml.
+
+# Every resource the tests create carries this name, so the sweeper can find leftovers.
+- name: Name this run
+  ansible.builtin.set_fact:
+    ci_prefix: "ansible-ci-{{ '%08x' % (4294967295 | random) }}"
+  when: ci_prefix is not defined

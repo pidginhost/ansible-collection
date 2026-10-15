@@ -1,0 +1,146 @@
+---
+# Slow and billed: a cluster takes several minutes to provision. Disabled by default; run with --allow-disabled.
+- name: Kubernetes cluster and its resources
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+      timeout: 2400
+  vars:
+    cluster: "{{ ci_prefix }}"
+  block:
+    - name: Read cluster types
+      pidginhost.cloud.kubernetes_cluster_types_info:
+      register: types
+
+    - name: Pick the smallest worker package of the dev type
+      ansible.builtin.set_fact:
+        worker_package: "{{ (types.cluster_types | selectattr('type', 'equalto', 'dev') | first).worker_node_packages
+                            | sort(attribute='id') | map(attribute='slug') | first }}"
+
+    - name: Create the cluster
+      pidginhost.cloud.kubernetes_cluster:
+        name: "{{ cluster }}"
+        cluster_type: dev
+        resource_pool_package: "{{ worker_package }}"
+        resource_pool_size: 1
+      register: create
+
+    - name: Create it again
+      pidginhost.cloud.kubernetes_cluster:
+        name: "{{ cluster }}"
+        cluster_type: dev
+        resource_pool_package: "{{ worker_package }}"
+        resource_pool_size: 1
+      register: create_again
+
+    - name: Read the kubeconfig
+      pidginhost.cloud.kubernetes_kubeconfig:
+        cluster_name: "{{ cluster }}"
+      register: kubeconfig
+      no_log: true
+
+    - name: Kubeconfig is usable and reading it changes nothing
+      ansible.builtin.assert:
+        that:
+          - kubeconfig is not changed
+          - "'apiVersion' in kubeconfig.kubeconfig"
+      no_log: true
+
+    - name: Expose a TCP service
+      pidginhost.cloud.kubernetes_route:
+        cluster_name: "{{ cluster }}"
+        protocol: tcp
+        name: ci-tcp
+        port: 8443
+        backend_service_name: web
+        backend_service_port: 443
+      register: route
+
+    - name: Same route again
+      pidginhost.cloud.kubernetes_route:
+        cluster_name: "{{ cluster }}"
+        protocol: tcp
+        name: ci-tcp
+        port: 8443
+        backend_service_name: web
+        backend_service_port: 443
+      register: route_again
+
+    - name: Allow a source on the load balancer
+      pidginhost.cloud.kubernetes_lb_firewall:
+        cluster_name: "{{ cluster }}"
+        rules:
+          - {direction: in, action: ACCEPT, protocol: tcp, dport: "8443", source: 192.0.2.0/24, comment: ci}
+      register: lbfw
+
+    - name: Same rules again
+      pidginhost.cloud.kubernetes_lb_firewall:
+        cluster_name: "{{ cluster }}"
+        rules:
+          - {direction: in, action: ACCEPT, protocol: tcp, dport: "8443", source: 192.0.2.0/24, comment: ci}
+      register: lbfw_again
+
+    - name: Talos has nothing to upgrade on a new cluster
+      pidginhost.cloud.kubernetes_cluster_upgrade:
+        cluster_name: "{{ cluster }}"
+        component: talos
+      register: talos
+
+    - name: Encryption is already off
+      pidginhost.cloud.kubernetes_cluster_encryption:
+        cluster_name: "{{ cluster }}"
+        mode: none
+      register: encryption
+
+    - name: Everything about the cluster
+      pidginhost.cloud.kubernetes_clusters_info:
+        cluster_name: "{{ cluster }}"
+        include: [resource_pools, tcp_routes, lb_firewall, encryption]
+      register: details
+
+    - name: Grow the worker pool
+      pidginhost.cloud.kubernetes_resource_pool:
+        cluster_name: "{{ cluster }}"
+        pool_id: "{{ details.clusters[0].resource_pools[0].id }}"
+        size: 2
+      register: grow
+
+    - name: Remove the route
+      pidginhost.cloud.kubernetes_route:
+        cluster_name: "{{ cluster }}"
+        protocol: tcp
+        name: ci-tcp
+        state: absent
+      register: route_delete
+
+    - name: Delete the cluster
+      pidginhost.cloud.kubernetes_cluster:
+        name: "{{ cluster }}"
+        state: absent
+        protected: false
+      register: delete
+
+    - name: Kubernetes checks
+      ansible.builtin.assert:
+        that:
+          - create is changed
+          - create.cluster.status == 'active'
+          - create_again is not changed
+          - route is changed
+          - route_again is not changed
+          - lbfw is changed
+          - lbfw_again is not changed
+          - talos is not changed
+          - encryption is not changed
+          - details.clusters[0].tcp_routes | selectattr('name', 'equalto', 'ci-tcp') | list | length == 1
+          - grow is changed
+          - grow.resource_pool.size == 2
+          - route_delete is changed
+          - delete is changed
+  always:
+    - name: Clean up the cluster
+      pidginhost.cloud.kubernetes_cluster:
+        name: "{{ cluster }}"
+        state: absent
+        protected: false
+      ignore_errors: true

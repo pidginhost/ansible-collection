@@ -14,11 +14,12 @@ import pytest
 
 from ansible.module_utils import basic
 from ansible.module_utils.common.text.converters import to_bytes
-from ansible.plugins.loader import init_plugin_loader
 
-# Plain pytest runs need the collection loader before anything imports ansible_collections;
-# ansible-test units installs it already.
+# Plain pytest runs need the collection loader before anything imports ansible_collections. ansible-test units
+# installs it already, and runs module tests where only module_utils can be imported.
 if not any(type(f).__name__ == "_AnsibleCollectionFinder" for f in sys.meta_path):
+    from ansible.plugins.loader import init_plugin_loader
+
     init_plugin_loader([os.path.abspath(os.path.join(os.path.dirname(__file__), *[os.pardir] * 5))])
 
 try:
@@ -68,9 +69,11 @@ class FakeAPI:
     def __init__(self):
         self.routes = {}
         self.calls = []
+        self.headers = []
+        self.timeouts = []
 
-    def add(self, method, path, body=None, status=200):
-        self.routes.setdefault((method, path), []).append((status, body))
+    def add(self, method, path, body=None, status=200, headers=None):
+        self.routes.setdefault((method, path), []).append((status, body, headers or {}))
         return self
 
     def __call__(self, module, url, data=None, headers=None, method=None, timeout=None, **kwargs):
@@ -78,17 +81,19 @@ class FakeAPI:
         assert headers["Authorization"] == "Token test-token"
         assert kwargs["unredirected_headers"] == ["Authorization"]
         path = url[len("https://www.pidginhost.com"):]
+        self.headers.append(headers)
+        self.timeouts.append(timeout)
         self.calls.append((method, path, json.loads(data) if data else None))
         queue = self.routes.get((method, path))
         if not queue:
             raise AssertionError("unexpected API call: %s %s" % (method, path))
-        status, body = queue.pop(0) if len(queue) > 1 else queue[0]
+        status, body, extra = queue.pop(0) if len(queue) > 1 else queue[0]
         if status == -1:
             return None, {"status": -1, "msg": "Connection refused"}
         raw = b"" if body is None else to_bytes(json.dumps(body))
         if 200 <= status < 300:
-            return FakeResponse(raw), {"status": status}
-        return None, {"status": status, "body": raw, "msg": "HTTP Error %s" % status}
+            return FakeResponse(raw), dict(extra, status=status)
+        return None, dict(extra, status=status, body=raw, msg="HTTP Error %s" % status)
 
     def requests(self, method=None, path=None):
         return [

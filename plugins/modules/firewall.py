@@ -198,17 +198,13 @@ firewall:
 
 from ansible.module_utils.basic import AnsibleModule
 
-from ..module_utils.common import PidginHostAPI, drop_none, pidginhost_argument_spec
+from ..module_utils.common import PidginHostAPI, drop_none, pidginhost_argument_spec, plan_rules
 
 RULES_SETS = "/api/cloud/firewall-rules-set/"
 MATCH_FIELDS = ("direction", "action", "protocol", "source", "sport", "destination", "dport")
 RULE_FIELDS = MATCH_FIELDS + ("enabled", "position")
 DIRECTIONS = ["in", "out"]
 ACTIONS = ["ACCEPT", "DROP", "REJECT"]
-
-
-def identity(rule):
-    return tuple("" if rule.get(k) is None else str(rule[k]) for k in MATCH_FIELDS)
 
 
 def desired_rules(module):
@@ -224,23 +220,6 @@ def desired_rules(module):
     return rules
 
 
-def plan(existing, desired, purge):
-    """Return (rules to create, (rule id, changes) to patch, rules to delete)."""
-    unmatched = list(existing)
-    create, patch = [], []
-    for rule in desired:
-        match = next((r for r in unmatched if identity(r) == identity(rule)), None)
-        if match is None:
-            create.append(drop_none(rule))
-            continue
-        unmatched.remove(match)
-        changes = dict(
-            (k, rule[k]) for k in ("enabled", "position") if rule[k] is not None and rule[k] != match.get(k))
-        if changes:
-            patch.append((match["id"], changes))
-    return create, patch, unmatched if purge else []
-
-
 def present(api, module, rules_set, desired):
     name = module.params["name"]
     created = rules_set is None
@@ -249,7 +228,8 @@ def present(api, module, rules_set, desired):
             module.exit_json(changed=True, firewall={"name": name, "rules": [drop_none(r) for r in desired]})
         rules_set = api.post(RULES_SETS, {"name": name})
 
-    create, patch, delete = plan(rules_set.get("rules") or [], desired, module.params["purge_rules"])
+    create, patch, delete = plan_rules(
+        rules_set.get("rules") or [], desired, MATCH_FIELDS, ("enabled", "position"), module.params["purge_rules"])
     if not (created or create or patch or delete):
         module.exit_json(changed=False, firewall=rules_set)
     if module.check_mode:

@@ -120,7 +120,14 @@ def main():
     if module.check_mode:
         module.exit_json(changed=True, firewall=merged)
     body = dict((k, merged.get(k)) for k in ("fw_rules_set", "fw_policy_in", "fw_policy_out"))
-    module.exit_json(changed=True, firewall=api.post(path, body))
+    applied = api.post(path, body)
+    kept = dict((k, applied.get(k)) for k, v in wanted.items() if applied.get(k) != v)
+    if kept:
+        # Some packages, such as the free tier, lock the firewall: the API answers but keeps its own values.
+        module.fail_json(
+            changed=any(applied.get(k) != current.get(k) for k in body), firewall=applied,
+            msg="The firewall of server %s is locked; the API kept %s." % (server["id"], kept))
+    module.exit_json(changed=True, firewall=applied)
 
 
 if __name__ == "__main__":

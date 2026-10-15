@@ -1,0 +1,2 @@
+---
+ci_ssh_pub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMDW8TttNTuWpTqG6RHt6ENABjSD0RmNDDygN2u6WvXM ansible-ci-test"

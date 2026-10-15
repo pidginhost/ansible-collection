@@ -1,0 +1,128 @@
+---
+# Needs pidginhost_dns_domain: a domain in the CI account with FreeDNS active.
+# Only records named after the run prefix are touched; zone and nameservers are checked in check mode.
+- name: Skip without a test domain
+  ansible.builtin.meta: end_play
+  when: pidginhost_dns_domain | default('') | length == 0
+
+- name: DNS records lifecycle
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+  vars:
+    zone: "{{ pidginhost_dns_domain }}"
+    source: "{{ pidginhost_dns_source | default('internal') }}"
+  block:
+    - name: The zone is already active
+      pidginhost.cloud.dns_zone:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        ip: 192.0.2.10
+      check_mode: true
+      register: zone_check
+
+    - name: Add an A record
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: A
+        address: 192.0.2.10
+        ttl: 300
+      register: add_a
+
+    - name: Add it again
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: A
+        address: 192.0.2.10
+        ttl: 300
+      register: add_a_again
+
+    - name: Add a second A record
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: A
+        address: 192.0.2.11
+        ttl: 300
+
+    - name: Replace both with one record
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: A
+        address: 192.0.2.12
+        ttl: 300
+        solo: true
+      register: solo
+
+    - name: Change the ttl
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: A
+        address: 192.0.2.12
+        ttl: 600
+      register: ttl
+
+    - name: Add a TXT, an MX and a CAA record
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: "{{ item.type }}"
+        txtdata: "{{ item.txtdata | default(omit) }}"
+        exchange: "{{ item.exchange | default(omit) }}"
+        preference: "{{ item.preference | default(omit) }}"
+        flag: "{{ item.flag | default(omit) }}"
+        tag: "{{ item.tag | default(omit) }}"
+        value: "{{ item.value | default(omit) }}"
+      loop:
+        - {type: TXT, txtdata: "v=spf1 -all"}
+        - {type: MX, exchange: "mail.example.com", preference: 10}
+        - {type: CAA, flag: 0, tag: issue, value: letsencrypt.org}
+      register: others
+
+    - name: List the run's records
+      pidginhost.cloud.dns_records_info:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+      register: listed
+
+    - name: Delete every A record of the name
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: A
+        state: absent
+      register: delete_a
+
+    - name: Changes are reported exactly when something changed
+      ansible.builtin.assert:
+        that:
+          - zone_check is not changed
+          - add_a is changed
+          - add_a_again is not changed
+          - solo is changed
+          - solo.records | length == 1
+          - ttl is changed
+          - others is changed
+          - listed.records | length == 4
+          - delete_a is changed
+  always:
+    - name: Clean up the run's records
+      pidginhost.cloud.dns_record:
+        domain: "{{ zone }}"
+        source: "{{ source }}"
+        name: "{{ ci_prefix }}"
+        type: "{{ item }}"
+        state: absent
+      loop: [A, TXT, MX, CAA]

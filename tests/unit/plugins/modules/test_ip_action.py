@@ -176,3 +176,41 @@ def test_detach_by_id_ignores_duplicate_hostname(api, run):
     assert not result.failed
     assert result.changed
     assert len(api.writes()) == 1
+
+
+def pending(**kw):
+    # Right after an attach the address already points at the server, but "attached" flips only once the
+    # network change is applied.
+    return ip(attached=False, server="web1", server_id=42, **kw)
+
+
+def test_pending_attach_to_target_is_unchanged(api, run):
+    api.add("GET", IPV4, listing(pending()))
+    api.add("GET", SERVERS + "42/", {"id": 42, "hostname": "web1"})
+
+    result = run(ip_action, ip_address="192.0.2.10", server_id=42)
+
+    assert not result.failed, result.result
+    assert not result.changed
+    assert api.writes() == []
+
+
+def test_pending_attach_to_other_server_fails(api, run):
+    api.add("GET", IPV4, listing(pending()))
+    api.add("GET", SERVERS + "43/", {"id": 43, "hostname": "web2"})
+
+    result = run(ip_action, ip_address="192.0.2.10", server_id=43)
+
+    assert result.failed
+    assert api.writes() == []
+
+
+def test_pending_attach_is_detached(api, run):
+    api.add("GET", IPV4, listing(pending()))
+    api.add("POST", IPV4 + "7/detach/", {"detached": True})
+    api.add("GET", IPV4 + "7/", ip())
+
+    result = run(ip_action, state="absent", ip_address="192.0.2.10")
+
+    assert result.changed
+    assert [(c[0], c[1]) for c in api.writes()] == [("POST", IPV4 + "7/detach/")]

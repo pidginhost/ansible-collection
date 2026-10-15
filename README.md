@@ -2,7 +2,7 @@
 
 ![PidginHost + Ansible](ph+an.png)
 
-The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys and object storage buckets. It also ships a dynamic inventory plugin and example playbooks.
+The `pidginhost.cloud` collection manages [PidginHost](https://www.pidginhost.com/) cloud resources through the public API: servers, volumes, snapshots, public and floating IPs, private networks, firewalls, SSH keys, object storage buckets, DNS and Kubernetes clusters. It also ships a dynamic inventory plugin and example playbooks.
 
 Every module supports check mode and makes no changes in it. Tasks leave resources that already match unchanged. Rebooting,
 rolling back a snapshot, rotating bucket keys and allocating an IP without an address always make a change.
@@ -60,6 +60,23 @@ Run `ansible-doc pidginhost.cloud.<module>` for options and examples.
 | Account | `ssh_key` | Add, rename or remove SSH keys, optionally removing all others. |
 | | `ssh_keys_info`, `profile_info` | List SSH keys and read the account profile. |
 | Catalog | `images_info`, `packages_info`, `generations_info` | List OS images, server packages and hardware generations. |
+| DNS | `dns_zone` | Turn FreeDNS hosting on or off for a domain. |
+| | `dns_record` | Manage A, AAAA, CNAME, MX, SRV, TXT and CAA records, optionally as the only record of its name and type. |
+| | `dns_zones_info`, `dns_records_info` | List FreeDNS zones and records. |
+| | `domain_nameservers` | Set the nameservers of a registered domain. |
+| | `domain_glue_record` | Manage child nameserver hosts registered for a domain. |
+| | `domains_info` | List registered domains. |
+| Kubernetes | `kubernetes_cluster` | Create, update or delete a cluster: features, protection, worker package and size. |
+| | `kubernetes_cluster_upgrade` | Upgrade Kubernetes, Talos, a feature or the load balancer. |
+| | `kubernetes_cluster_encryption` | Turn WireGuard encryption of cluster traffic on or off. |
+| | `kubernetes_kubeconfig` | Read or regenerate the kubeconfig. |
+| | `kubernetes_resource_pool` | Create, resize or delete a worker pool. |
+| | `kubernetes_node` | Reboot or remove one worker node. |
+| | `kubernetes_route` | Expose a service through an HTTP, TCP or UDP route. |
+| | `kubernetes_port_forward` | Forward a load balancer port to an internal address. |
+| | `kubernetes_lb_firewall` | Manage the load balancer firewall rules. |
+| | `kubernetes_cluster_vm` | Connect a cloud server to the cluster network or disconnect it. |
+| | `kubernetes_clusters_info`, `kubernetes_cluster_types_info` | List clusters with their pools, routes and other settings, and the cluster types. |
 
 All modules belong to the `pidginhost.cloud.all` action group, so the token can be set once:
 ```yaml
@@ -85,8 +102,12 @@ Each host gets the server attributes as variables and `ansible_user` set to the 
 
 ## Waiting for changes
 Modules with a `wait` option (default `true`) return once the operation has finished, or fail after `timeout` seconds. For
-servers, snapshots and buckets, running a task again while an earlier operation is still in progress waits for it instead of
+servers, snapshots, buckets and Kubernetes clusters, running a task again while an earlier operation is still in progress waits for it instead of
 starting another one.
+
+When the API rate-limits a request, the module waits as asked and retries within `timeout`.
+
+Kubeconfig and bucket credential results contain secrets. Set `no_log: true` on the tasks that read or use them.
 
 ## Example playbooks
 `playbooks/` holds one short playbook per module family. `playbooks/profile_info.yml` is a safe first run that only reads the account profile:
@@ -96,15 +117,28 @@ ansible-playbook playbooks/profile_info.yml
 `playbooks/install-nginx.yml` configures an existing server over SSH.
 
 ## Development
-Both test suites need the checkout at a path ending in `ansible_collections/pidginhost/cloud`.
+Tests need the checkout at a path ending in `ansible_collections/pidginhost/cloud`.
 ```bash
-ansible-test units --docker
 ansible-test sanity --docker
-
-# or plain pytest, with ansible-core and pytest installed
-pytest tests/unit
+ansible-test units --docker
 ```
-Never commit real tokens.
+
+Integration tests create, change and delete real resources, so run them against a dedicated CI account. Named resources
+use `ansible-ci-...` and private networks use documentation subnets; each target removes what it created.
+```bash
+cp tests/integration/integration_config.yml.template tests/integration/integration_config.yml   # add the token
+ansible-test integration --docker default pidginhost
+ansible-test integration --docker default --allow-disabled kubernetes   # slow, creates a billed cluster
+ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml   # remove leftovers
+```
+
+The cleanup playbook sweeps leftovers from failed runs: resources and DNS records with the test prefix and the test
+private networks. Public IPs carry no test name, so it releases unattached addresses only with
+`-e cleanup_unbound_ips=true`, which CI passes for its own account. Preview it with `--check` before running it by hand.
+
+GitHub Actions runs sanity and unit tests on every pull request for ansible-core 2.16 to 2.21 and devel. Integration
+tests run on pushes to `main`, weekly, and on demand, using the `PIDGINHOST_CI_TOKEN` secret and the optional
+`PIDGINHOST_CI_DNS_DOMAIN` variable. Never commit real tokens.
 
 ## License
 GNU General Public License v3.0 or later. See [`LICENSE`](LICENSE).

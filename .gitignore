@@ -2,3 +2,4 @@
 /tests/output/
 /pidginhost-cloud-*.tar.gz
 __pycache__/
+/tests/integration/integration_config.yml

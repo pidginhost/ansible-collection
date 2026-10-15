@@ -17,7 +17,9 @@ options:
     required: true
   timeout:
     description:
-      - Seconds to wait for an API request, and for long running operations when the module waits for them.
+      - Seconds to wait for an API request, including retries after throttling, and for each long running operation wait.
+      - Requests made while waiting share that wait's remaining time, with at least 10 seconds each. A retry is not
+        sent if its delay would exhaust the remaining time.
     type: int
     default: 300
 """

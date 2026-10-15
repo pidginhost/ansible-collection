@@ -22,6 +22,7 @@ def detail(rescue_mode=False, **kw):
 
 
 def test_present_enters_rescue_and_waits(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     api.add("GET", SERVERS, listing({"id": 42, "hostname": "web1"}))
     api.add("GET", SERVER, detail())
     api.add("GET", SERVER, detail())
@@ -37,6 +38,7 @@ def test_present_enters_rescue_and_waits(api, run):
 
 
 def test_present_default_image_sends_empty_body(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     api.add("GET", SERVER, detail())
     api.add("GET", SERVER, detail(True))
     api.add("POST", SERVER + "rescue/enter/", {"queued": True}, status=202)
@@ -66,6 +68,7 @@ def test_present_check_mode_makes_no_writes(api, run):
 
 
 def test_absent_exits_rescue_and_waits(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     api.add("GET", SERVER, detail(True))
     api.add("GET", SERVER, detail())
     api.add("POST", SERVER + "rescue/exit/", {"queued": True}, status=202)
@@ -88,6 +91,7 @@ def test_absent_not_in_rescue_is_unchanged(api, run):
 
 
 def test_timeout_fails(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     api.add("GET", SERVER, detail(True))
     api.add("POST", SERVER + "rescue/exit/", {"queued": True}, status=202)
 
@@ -98,6 +102,7 @@ def test_timeout_fails(api, run):
 
 
 def test_api_error_fails(api, run):
+    api.add("GET", SERVER + "activity/", {"logs": []})
     api.add("GET", SERVER, detail())
     api.add("POST", SERVER + "rescue/enter/", {"message": "Unknown ISO."}, status=400)
 
@@ -105,3 +110,66 @@ def test_api_error_fails(api, run):
 
     assert result.failed
     assert "Unknown ISO" in result["msg"]
+
+
+def test_refused_exit_fails_at_once(api, run):
+    # The API answers 202; the queued task only logs that it could not run.
+    api.add("GET", SERVER, detail(True))
+    api.add("POST", SERVER + "rescue/exit/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [{
+        "date": "2026-01-01 12:00",
+        "message": "Could not exit ISO boot: the server could not start from its disk."}]})
+
+    result = run(server_rescue, server_id=42, state="absent", timeout=5)
+
+    assert result.failed
+    assert result.changed
+    assert "could not start from its disk" in result["msg"]
+    assert len(api.writes()) == 1
+
+
+def test_busy_past_the_timeout_fails(api, run):
+    busy = {"date": "2026-01-01 12:00", "message": "Could not exit rescue mode: another server operation is in progress."}
+    api.add("GET", SERVER, detail(True))
+    api.add("POST", SERVER + "rescue/exit/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [busy]})
+
+    result = run(server_rescue, server_id=42, state="absent", timeout=0)
+
+    assert result.failed
+    assert result.changed
+
+
+def test_refused_enter_fails_at_once(api, run):
+    api.add("GET", SERVER, detail())
+    api.add("POST", SERVER + "rescue/enter/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [{
+        "date": "2026-01-01 12:00", "message": "Could not boot from ISO: that image is no longer available."}]})
+
+    result = run(server_rescue, server_id=42, iso="gone", timeout=5)
+
+    assert result.failed
+    assert "no longer available" in result["msg"]
+
+
+def test_busy_refusal_is_resubmitted(api, run):
+    # "Another server operation is in progress" means nothing ran: send the request again.
+    busy = {"date": "2026-01-01 12:00", "message": "Could not exit rescue mode: another server operation is in progress."}
+    api.add("GET", SERVER, detail(True))
+    api.add("GET", SERVER, detail(True))
+    api.add("GET", SERVER, detail())
+    api.add("POST", SERVER + "rescue/exit/", {"queued": True}, status=202)
+    api.add("GET", SERVER + "activity/", {"logs": []})
+    api.add("GET", SERVER + "activity/", {"logs": [busy]})
+    api.add("GET", SERVER + "activity/", {"logs": [busy]})
+    api.add("GET", SERVER + "activity/", {"logs": [busy, {"date": "2026-01-01 12:01", "message": "Server exited ISO boot."}]})
+
+    result = run(server_rescue, server_id=42, state="absent", timeout=120)
+
+    assert not result.failed, result.result
+    assert result.changed
+    assert result["server"]["rescue_mode"] is False
+    assert [c[1] for c in api.writes()] == [SERVER + "rescue/exit/", SERVER + "rescue/exit/"]

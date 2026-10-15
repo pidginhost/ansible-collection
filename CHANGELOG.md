@@ -5,6 +5,8 @@
 ### Added
 - New modules manage server snapshots, rescue mode, public IP allocation and reverse DNS, floating IPs, private networks and object storage buckets.
 - New info modules list hardware generations, floating IPs, private networks and buckets.
+- New modules manage FreeDNS zones and records, domain nameservers and glue records.
+- New modules manage Kubernetes clusters, upgrades, encryption, kubeconfig, worker pools and nodes, routes, port forwards, load balancer firewall rules and connected servers.
 - Servers can be created with a startup script, a hardware generation and high availability, and protected from deletion.
 - Server packages can be filtered by hardware generation.
 
@@ -14,6 +16,8 @@
 - Requires ansible-core 2.16 or later and works with the latest Ansible release.
 
 ### Fixed
+- Applying a firewall to a server whose firewall is locked fails with a clear message instead of reporting a change.
+- Modules wait and try again when the API asks them to slow down, instead of failing.
 - The API token is no longer sent to another host when a request is redirected.
 - Reboots and package changes report success only once they have finished.
 - A failed task still reports the changes it made before the error.

@@ -1,0 +1,100 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      kubernetes:
+        description: Also run the Kubernetes integration target (slow, creates a billed cluster)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sanity:
+    name: Sanity (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.ansible == 'devel' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible: [stable-2.16, stable-2.17, stable-2.18, stable-2.19, stable-2.20, stable-2.21, devel]
+    steps:
+      - uses: ansible-community/ansible-test-gh-action@v1.18.0
+        with:
+          ansible-core-version: ${{ matrix.ansible }}
+          testing-type: sanity
+
+  units:
+    name: Units (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.ansible == 'devel' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible: [stable-2.16, stable-2.17, stable-2.18, stable-2.19, stable-2.20, stable-2.21, devel]
+    steps:
+      - uses: ansible-community/ansible-test-gh-action@v1.18.0
+        with:
+          ansible-core-version: ${{ matrix.ansible }}
+          testing-type: units
+
+  integration:
+    name: Integration (live API)
+    # Runs against the CI account, which is billed: never on pull requests, one run at a time.
+    if: github.event_name != 'pull_request'
+    needs: [sanity, units]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    concurrency:
+      group: pidginhost-ci-account
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: ansible_collections/pidginhost/cloud
+    env:
+      PIDGINHOST_CI_TOKEN: ${{ secrets.PIDGINHOST_CI_TOKEN }}
+      PIDGINHOST_CI_DNS_DOMAIN: ${{ vars.PIDGINHOST_CI_DNS_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          path: ansible_collections/pidginhost/cloud
+
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install ansible-core
+        run: python -m pip install "ansible-core>=2.21,<2.22"
+
+      - name: Write the integration config
+        run: |
+          test -n "$PIDGINHOST_CI_TOKEN" || { echo "PIDGINHOST_CI_TOKEN secret is not set"; exit 1; }
+          umask 077
+          printf 'pidginhost_token: "%s"\npidginhost_dns_domain: "%s"\n' \
+            "$PIDGINHOST_CI_TOKEN" "$PIDGINHOST_CI_DNS_DOMAIN" > tests/integration/integration_config.yml
+
+      - name: Run integration targets
+        env:
+          WITH_KUBERNETES: ${{ inputs.kubernetes }}
+        run: |
+          if [ "$WITH_KUBERNETES" = "true" ]; then
+            ansible-test integration --docker default --color yes --allow-disabled pidginhost
+          else
+            ansible-test integration --docker default --color yes pidginhost
+          fi
+
+      - name: Remove leftovers from the CI account
+        if: always()
+        run: >-
+          ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml
+          -e cleanup_unbound_ips=true
+        env:
+          ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}

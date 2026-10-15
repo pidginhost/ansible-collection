@@ -1,0 +1,234 @@
+---
+# Removes what failed integration runs left behind in the CI account: every resource whose name starts
+# with "ansible-ci-" and the test private networks. Public IPs carry no test name, so unattached ones are
+# released only with -e cleanup_unbound_ips=true, which CI passes for its dedicated account. Run it there only:
+#   ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml
+- name: Sweep integration test leftovers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+      timeout: 1800
+  vars:
+    prefix: ansible-ci-
+    cleanup_failures: []
+  tasks:
+    - name: Clean up clusters
+      block:
+        - name: Read clusters
+          pidginhost.cloud.kubernetes_clusters_info:
+          register: clusters
+
+        - name: Delete leftover clusters
+          pidginhost.cloud.kubernetes_cluster:
+            cluster_id: "{{ item.id }}"
+            state: absent
+            protected: false
+          loop: "{{ clusters.clusters | selectattr('name', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.name }}"
+      rescue:
+        - name: Record clusters cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['clusters'] }}"
+
+    - name: Clean up floating IPs
+      block:
+        - name: Read floating IPs
+          pidginhost.cloud.floating_ips_info:
+          register: floating
+
+        - name: Delete leftover floating IPs
+          pidginhost.cloud.floating_ip:
+            floating_ip_id: "{{ item.id }}"
+            version: "{{ item.version }}"
+            state: absent
+          loop: "{{ floating.floating_ips | selectattr('label', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.label }}"
+      rescue:
+        - name: Record floating IPs cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['floating IPs'] }}"
+
+    - name: Clean up servers
+      block:
+        - name: Read servers
+          pidginhost.cloud.servers_info:
+          register: servers
+
+        - name: Delete leftover servers
+          pidginhost.cloud.server:
+            server_id: "{{ item.id }}"
+            state: absent
+            destroy_protection: false
+          loop: "{{ servers.servers | selectattr('hostname', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.hostname }}"
+      rescue:
+        - name: Record servers cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['servers'] }}"
+
+    - name: Clean up public ipv4 addresses
+      when: cleanup_unbound_ips | default(false) | bool
+      block:
+        - name: Read public ipv4 addresses
+          pidginhost.cloud.ips_info:
+            ip_type: ipv4
+          register: public_ips
+
+        # An address can be assigned before attached becomes true. Keep both assigned and attached IPs.
+        - name: Release unbound public ipv4 addresses
+          pidginhost.cloud.ip:
+            address: "{{ item.address }}"
+            state: absent
+          loop: "{{ public_ips.ips | rejectattr('attached') | selectattr('server_id', 'none') | list }}"
+          loop_control:
+            label: "{{ item.address }}"
+      rescue:
+        - name: Record public ipv4 addresses cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['public ipv4 addresses'] }}"
+
+    - name: Clean up public ipv6 addresses
+      when: cleanup_unbound_ips | default(false) | bool
+      block:
+        - name: Read public ipv6 addresses
+          pidginhost.cloud.ips_info:
+            ip_type: ipv6
+          register: public_ips
+
+        # An address can be assigned before attached becomes true. Keep both assigned and attached IPs.
+        - name: Release unbound public ipv6 addresses
+          pidginhost.cloud.ip:
+            address: "{{ item.address }}"
+            state: absent
+          loop: "{{ public_ips.ips | rejectattr('attached') | selectattr('server_id', 'none') | list }}"
+          loop_control:
+            label: "{{ item.address }}"
+      rescue:
+        - name: Record public ipv6 addresses cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['public ipv6 addresses'] }}"
+
+    - name: Clean up volumes
+      block:
+        - name: Read volumes
+          pidginhost.cloud.volumes_info:
+          register: volumes
+
+        - name: Delete leftover volumes
+          pidginhost.cloud.volume:
+            volume_alias: "{{ item.alias }}"
+            state: absent
+          loop: "{{ volumes.volumes | selectattr('alias', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.alias }}"
+      rescue:
+        - name: Record volumes cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['volumes'] }}"
+
+    - name: Clean up buckets
+      block:
+        - name: Read buckets
+          pidginhost.cloud.buckets_info:
+          register: buckets
+
+        - name: Delete leftover buckets
+          pidginhost.cloud.bucket:
+            name: "{{ item.name }}"
+            state: absent
+          loop: "{{ buckets.buckets | selectattr('name', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.name }}"
+      rescue:
+        - name: Record buckets cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['buckets'] }}"
+
+    - name: Clean up rules sets
+      block:
+        - name: Read rules sets
+          pidginhost.cloud.firewalls_info:
+          register: firewalls
+
+        - name: Delete leftover rules sets
+          pidginhost.cloud.firewall:
+            name: "{{ item.name }}"
+            state: absent
+          loop: "{{ firewalls.firewalls | selectattr('name', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.name }}"
+      rescue:
+        - name: Record rules sets cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['rules sets'] }}"
+
+    - name: Clean up private networks
+      block:
+        - name: Read private networks
+          pidginhost.cloud.private_networks_info:
+          register: networks
+
+        - name: Delete leftover private networks
+          pidginhost.cloud.private_network:
+            address: "{{ item.address }}"
+            state: absent
+          loop: "{{ networks.private_networks | selectattr('address', 'in', ['198.51.100.0/24', '203.0.113.0/24']) | list }}"
+          loop_control:
+            label: "{{ item.address }}"
+      rescue:
+        - name: Record private networks cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['private networks'] }}"
+
+    - name: Clean up SSH keys
+      block:
+        - name: Read SSH keys
+          pidginhost.cloud.ssh_keys_info:
+          register: keys
+
+        - name: Delete leftover SSH keys
+          pidginhost.cloud.ssh_key:
+            ssh_pub_key: "{{ item.key }}"
+            state: absent
+          loop: "{{ keys.ssh_keys | selectattr('alias', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.alias }}"
+      rescue:
+        - name: Record SSH keys cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['SSH keys'] }}"
+
+    - name: Clean up DNS records
+      when: pidginhost_dns_domain | default('') | length > 0
+      block:
+        - name: Read DNS records
+          pidginhost.cloud.dns_records_info:
+            domain: "{{ pidginhost_dns_domain }}"
+            source: "{{ pidginhost_dns_source | default('internal') }}"
+          register: dns
+
+        - name: Delete leftover DNS records
+          pidginhost.cloud.dns_record:
+            domain: "{{ pidginhost_dns_domain }}"
+            source: "{{ pidginhost_dns_source | default('internal') }}"
+            name: "{{ item.name }}"
+            type: "{{ 'CAA' if item.type == 'TYPE257' else item.type }}"
+            state: absent
+          loop: "{{ dns.records | selectattr('name', 'match', prefix) | list }}"
+          loop_control:
+            label: "{{ item.name }} {{ item.type }}"
+      rescue:
+        - name: Record DNS records cleanup failure
+          ansible.builtin.set_fact:
+            cleanup_failures: "{{ cleanup_failures + ['DNS records'] }}"
+
+    - name: Report incomplete cleanup
+      ansible.builtin.fail:
+        msg: "Cleanup failed for: {{ cleanup_failures | join(', ') }}. Check the task failures above."
+      when: cleanup_failures | length > 0

@@ -1,0 +1,481 @@
+---
+# One server carries the server, storage and network modules. Everything is removed in the always block.
+- name: Server and attached resources
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+      timeout: 900
+  vars:
+    hostname: "{{ ci_prefix }}.example.com"
+    network: 203.0.113.0/24
+  block:
+    - name: Read packages
+      pidginhost.cloud.packages_info:
+      register: packages
+
+    - name: Read images
+      pidginhost.cloud.images_info:
+      register: images
+
+    - name: Read storage products
+      pidginhost.cloud.volumes_products_info:
+      register: storage
+
+    - name: Remember the choices
+      ansible.builtin.set_fact:
+        # Free tier packages (cloudv-0) lock the firewall, so default to the smallest paid one.
+        package: "{{ pidginhost_server_package | default('cloudv-1') }}"
+        image: "{{ pidginhost_server_image | default(((images.images | selectattr('slug', 'match', 'ubuntu') | list)
+                   or images.images)[0].slug) }}"
+        storage_product: "{{ storage.volumes[0] }}"
+
+    # Server
+
+    - name: Create the server (check mode)
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        image: "{{ image }}"
+        package: "{{ package }}"
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        new_ipv4: true
+      check_mode: true
+      register: create_check
+
+    - name: Create the server
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        image: "{{ image }}"
+        package: "{{ package }}"
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        new_ipv4: true
+        project: "{{ ci_prefix }}"
+      register: create
+
+    - name: Create the server again
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        image: "{{ image }}"
+        package: "{{ package }}"
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        new_ipv4: true
+        project: "{{ ci_prefix }}"
+      register: create_again
+
+    - name: Protect the server from deletion
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        destroy_protection: true
+      register: protect
+
+    - name: Deleting a protected server fails
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        state: absent
+      register: delete_protected
+      ignore_errors: true
+
+    - name: Server details with extras
+      pidginhost.cloud.servers_info:
+        server_hostname: "{{ hostname }}"
+        include: [snapshots, usage, traffic, activity, boot_isos]
+      register: details
+
+    - name: Public addresses
+      pidginhost.cloud.server_public_ip:
+        server_hostname: "{{ hostname }}"
+      register: public_ip
+
+    - name: Server checks
+      ansible.builtin.assert:
+        that:
+          - package in (packages.packages | map(attribute='slug'))
+          - create_check is changed
+          - create is changed
+          - create.server.status == 'active'
+          - create_again is not changed
+          - protect is changed
+          - delete_protected is failed
+          - details.servers | length == 1
+          - details.servers[0].boot_isos is sequence
+          - public_ip.ipv4 | length > 0
+
+    # Power
+
+    - name: Stop the server
+      pidginhost.cloud.server_action_power:
+        server_hostname: "{{ hostname }}"
+        state: stop
+      register: stop
+
+    - name: Stop it again
+      pidginhost.cloud.server_action_power:
+        server_hostname: "{{ hostname }}"
+        state: stop
+      register: stop_again
+
+    - name: Start the server
+      pidginhost.cloud.server_action_power:
+        server_hostname: "{{ hostname }}"
+        state: start
+      register: start
+
+    - name: Reboot the server
+      pidginhost.cloud.server_action_power:
+        server_hostname: "{{ hostname }}"
+        state: reboot
+      register: reboot
+
+    - name: Power checks
+      ansible.builtin.assert:
+        that:
+          - stop is changed
+          - stop_again is not changed
+          - start is changed
+          - start.action.status == 'running'
+          - reboot is changed
+
+    # Snapshots
+
+    - name: Take a snapshot
+      pidginhost.cloud.server_snapshot:
+        server_hostname: "{{ hostname }}"
+        name: ci_snap
+      register: snap
+
+    - name: Take it again
+      pidginhost.cloud.server_snapshot:
+        server_hostname: "{{ hostname }}"
+        name: ci_snap
+      register: snap_again
+
+    - name: Roll back to it
+      pidginhost.cloud.server_snapshot:
+        server_hostname: "{{ hostname }}"
+        name: ci_snap
+        state: rollback
+      register: rollback
+
+    # Right after a rollback the platform refuses snapshot deletes for a minute or two; the module reports it.
+    - name: Delete it
+      pidginhost.cloud.server_snapshot:
+        server_hostname: "{{ hostname }}"
+        name: ci_snap
+        state: absent
+      register: snap_delete
+      until: snap_delete is succeeded
+      retries: 6
+      delay: 30
+
+    - name: Snapshot checks
+      ansible.builtin.assert:
+        that:
+          - snap is changed
+          - snap_again is not changed
+          - rollback is changed
+          - snap_delete is changed
+
+    # Volumes
+
+    - name: Create a volume on the server
+      pidginhost.cloud.volume:
+        volume_alias: "{{ ci_prefix }}"
+        hostname: "{{ hostname }}"
+        product: "{{ storage_product.slug }}"
+        size_gigabytes: "{{ storage_product.min_size }}"
+      register: volume
+
+    - name: Create it again
+      pidginhost.cloud.volume:
+        volume_alias: "{{ ci_prefix }}"
+        hostname: "{{ hostname }}"
+        product: "{{ storage_product.slug }}"
+        size_gigabytes: "{{ storage_product.min_size }}"
+      register: volume_again
+
+    - name: Grow the volume
+      pidginhost.cloud.volume:
+        volume_alias: "{{ ci_prefix }}"
+        size_gigabytes: "{{ storage_product.min_size + 1 }}"
+      register: grow
+
+    - name: Detach the volume
+      pidginhost.cloud.volume_action:
+        volume_alias: "{{ ci_prefix }}"
+        server_hostname: "{{ hostname }}"
+        state: absent
+      register: detach
+
+    - name: Detach it again
+      pidginhost.cloud.volume_action:
+        volume_alias: "{{ ci_prefix }}"
+        server_hostname: "{{ hostname }}"
+        state: absent
+      register: detach_again
+
+    - name: Wait for the detach to finish
+      pidginhost.cloud.volumes_info:
+      register: volumes
+      until: volumes.volumes | selectattr('alias', 'equalto', ci_prefix) | map(attribute='server') | first == ''
+      retries: 30
+      delay: 10
+
+    - name: Delete the volume
+      pidginhost.cloud.volume:
+        volume_alias: "{{ ci_prefix }}"
+        state: absent
+      register: volume_delete
+
+    - name: Volume checks
+      ansible.builtin.assert:
+        that:
+          - volume is changed
+          - volume_again is not changed
+          - grow is changed
+          - grow.volume.size == storage_product.min_size + 1
+          - detach is changed
+          - detach_again is not changed
+          - volume_delete is changed
+
+    # Public IPs
+
+    - name: Allocate an IPv4 address
+      pidginhost.cloud.ip:
+        version: 4
+      register: new_ip
+
+    - name: Attach it
+      pidginhost.cloud.ip_action:
+        ip_address: "{{ new_ip.ip.address }}"
+        server_hostname: "{{ hostname }}"
+      register: attach_ip
+
+    - name: Attach it again
+      pidginhost.cloud.ip_action:
+        ip_address: "{{ new_ip.ip.address }}"
+        server_hostname: "{{ hostname }}"
+      register: attach_ip_again
+
+    # Attaching sets the PTR to the server hostname, so use another name to see a change.
+    - name: Set reverse DNS
+      pidginhost.cloud.ip:
+        address: "{{ new_ip.ip.address }}"
+        reverse_dns: "mail.{{ hostname }}"
+      register: rdns
+
+    - name: Set it again
+      pidginhost.cloud.ip:
+        address: "{{ new_ip.ip.address }}"
+        reverse_dns: "mail.{{ hostname }}"
+      register: rdns_again
+
+    - name: Detach the address
+      pidginhost.cloud.ip_action:
+        ip_address: "{{ new_ip.ip.address }}"
+        state: absent
+      register: detach_ip
+
+    - name: Release the address
+      pidginhost.cloud.ip:
+        address: "{{ new_ip.ip.address }}"
+        state: absent
+      register: release_ip
+
+    - name: IP checks
+      ansible.builtin.assert:
+        that:
+          - new_ip is changed
+          - attach_ip is changed
+          - attach_ip_again is not changed
+          - rdns is changed
+          - rdns_again is not changed
+          - detach_ip is changed
+          - release_ip is changed
+
+    # Firewall on the public interface
+
+    - name: Create a rules set
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        rules:
+          - {direction: in, action: ACCEPT, protocol: tcp, dport: "22"}
+
+    - name: Apply it to the server
+      pidginhost.cloud.firewall_action:
+        server_hostname: "{{ hostname }}"
+        rules_set_name: "{{ ci_prefix }}"
+        policy_in: DROP
+        policy_out: ACCEPT
+      register: apply_fw
+
+    - name: Apply it again
+      pidginhost.cloud.firewall_action:
+        server_hostname: "{{ hostname }}"
+        rules_set_name: "{{ ci_prefix }}"
+        policy_in: DROP
+        policy_out: ACCEPT
+      register: apply_fw_again
+
+    - name: Read the public interface
+      pidginhost.cloud.public_interface_info:
+        server_hostname: "{{ hostname }}"
+      register: interface
+
+    - name: Firewall checks
+      ansible.builtin.assert:
+        that:
+          - apply_fw is changed
+          - apply_fw_again is not changed
+          - interface.interfaces.fw_policy_in == 'DROP'
+
+    # Private network
+
+    - name: Create a private network
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+
+    - name: Join it
+      pidginhost.cloud.private_network_server:
+        network: "{{ network }}"
+        server_hostname: "{{ hostname }}"
+      register: join
+
+    - name: Join it again
+      pidginhost.cloud.private_network_server:
+        network: "{{ network }}"
+        server_hostname: "{{ hostname }}"
+      register: join_again
+
+    - name: Leave it
+      pidginhost.cloud.private_network_server:
+        network: "{{ network }}"
+        server_hostname: "{{ hostname }}"
+        state: absent
+      register: leave
+
+    - name: Private network checks
+      ansible.builtin.assert:
+        that:
+          - join is changed
+          - join_again is not changed
+          - leave is changed
+
+    # Floating IP
+
+    - name: Create a floating IP allowed on the server
+      pidginhost.cloud.floating_ip:
+        label: "{{ ci_prefix }}"
+        authorized_servers: ["{{ hostname }}"]
+      register: fip
+
+    - name: Same floating IP again
+      pidginhost.cloud.floating_ip:
+        label: "{{ ci_prefix }}"
+        authorized_servers: ["{{ hostname }}"]
+      register: fip_again
+
+    - name: Remove every authorization
+      pidginhost.cloud.floating_ip:
+        label: "{{ ci_prefix }}"
+        authorized_servers: []
+      register: fip_unauthorize
+
+    - name: Delete the floating IP
+      pidginhost.cloud.floating_ip:
+        label: "{{ ci_prefix }}"
+        state: absent
+      register: fip_delete
+
+    - name: Floating IP checks
+      ansible.builtin.assert:
+        that:
+          - fip is changed
+          - fip.floating_ip.authorized_servers | length == 1
+          - fip_again is not changed
+          - fip_unauthorize is changed
+          - fip_delete is changed
+
+    # Rescue mode
+
+    - name: Enter rescue mode
+      pidginhost.cloud.server_rescue:
+        server_hostname: "{{ hostname }}"
+      register: rescue
+
+    - name: Leave rescue mode
+      pidginhost.cloud.server_rescue:
+        server_hostname: "{{ hostname }}"
+        state: absent
+      register: rescue_exit
+
+    - name: Rescue checks
+      ansible.builtin.assert:
+        that:
+          - rescue is changed
+          - rescue_exit is changed
+
+    # Deletion
+
+    - name: Delete the server, turning protection off
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        state: absent
+        destroy_protection: false
+      register: delete
+
+    - name: Delete it again
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        state: absent
+      register: delete_again
+
+    - name: Deletion checks
+      ansible.builtin.assert:
+        that:
+          - delete is changed
+          - delete_again is not changed
+
+  always:
+    - name: Clean up the floating IP
+      pidginhost.cloud.floating_ip:
+        label: "{{ ci_prefix }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Clean up the server
+      pidginhost.cloud.server:
+        hostname: "{{ hostname }}"
+        state: absent
+        destroy_protection: false
+      ignore_errors: true
+
+    - name: Clean up the volume
+      pidginhost.cloud.volume:
+        volume_alias: "{{ ci_prefix }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Clean up the address
+      pidginhost.cloud.ip:
+        address: "{{ new_ip.ip.address }}"
+        state: absent
+      when: new_ip.ip.address is defined
+      ignore_errors: true
+
+    - name: Clean up the private network
+      pidginhost.cloud.private_network:
+        address: "{{ network }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Clean up the rules set
+      pidginhost.cloud.firewall:
+        name: "{{ ci_prefix }}"
+        state: absent
+      ignore_errors: true
+
+    # Creating a server with ssh_pub_key also stores the key in the account.
+    - name: Clean up the stored SSH key
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        state: absent
+      ignore_errors: true

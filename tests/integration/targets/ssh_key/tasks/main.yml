@@ -1,0 +1,63 @@
+---
+- name: SSH key lifecycle
+  module_defaults:
+    group/pidginhost.cloud.all:
+      token: "{{ pidginhost_token }}"
+  block:
+    - name: Start without the key
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        state: absent
+
+    - name: Add the key (check mode)
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        alias: "{{ ci_prefix }}"
+      check_mode: true
+      register: add_check
+
+    - name: Add the key
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        alias: "{{ ci_prefix }}"
+      register: add
+
+    - name: Add the key again
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        alias: "{{ ci_prefix }}"
+      register: add_again
+
+    - name: Rename the key
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        alias: "{{ ci_prefix }}-renamed"
+      register: rename
+
+    - name: Remove the key
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        state: absent
+      register: remove
+
+    - name: Remove the key again
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        state: absent
+      register: remove_again
+
+    - name: Changes are reported exactly when something changed
+      ansible.builtin.assert:
+        that:
+          - add_check is changed
+          - add is changed
+          - add.ssh_key.fingerprint | length > 0
+          - add_again is not changed
+          - rename is changed
+          - remove is changed
+          - remove_again is not changed
+  always:
+    - name: Clean up the key
+      pidginhost.cloud.ssh_key:
+        ssh_pub_key: "{{ ci_ssh_pub_key }}"
+        state: absent
