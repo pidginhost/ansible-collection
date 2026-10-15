@@ -278,8 +278,8 @@ def test_retried_request_uses_remaining_timeout(api, make_module, clock, monkeyp
         return api(*args, **kwargs)
 
     monkeypatch.setattr(common, "fetch_url", request)
-    assert PidginHostAPI(make_module(timeout=10)).get(SERVERS) == []
-    assert timeouts == [10, 7]
+    assert PidginHostAPI(make_module(timeout=30)).get(SERVERS) == []
+    assert timeouts == [30, 27]
 
 
 @pytest.mark.parametrize("timeout", [0, 5])
@@ -374,3 +374,16 @@ def test_finished_wait_does_not_limit_later_requests(api, make_module, clock):
 
     assert client.get(SERVERS) == []
     assert clock.now == 13
+
+
+def test_requests_near_the_end_of_a_wait_keep_a_usable_timeout(api, make_module, monkeypatch):
+    # The last poll of a wait can start with well under a second left; a request that short fails on a real network.
+    monkeypatch.setattr("ansible_collections.pidginhost.cloud.plugins.module_utils.common.time.monotonic",
+                        lambda: 299.5)
+    api.add("GET", SERVERS + "9/", {"status": "provisioning"})
+    client = PidginHostAPI(make_module(timeout=300))
+    client._wait_deadline = 300
+
+    client.get(SERVERS + "9/")
+
+    assert api.timeouts == [10]

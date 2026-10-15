@@ -16,9 +16,6 @@
 - Requires ansible-core 2.16 or later and works with the latest Ansible release.
 
 ### Fixed
-- Throttled tasks respect the requested retry delay and stop retrying when their timeout expires.
-- Snapshot and rescue tasks report operation failures without resubmitting them.
-- Integration cleanup releases unused public addresses and removes test DNS records, continues after errors, and reports incomplete cleanup.
 - Applying a firewall to a server whose firewall is locked fails with a clear message instead of reporting a change.
 - Modules wait and try again when the API asks them to slow down, instead of failing.
 - The API token is no longer sent to another host when a request is redirected.

@@ -69,6 +69,7 @@ class FakeAPI:
         self.routes = {}
         self.calls = []
         self.headers = []
+        self.timeouts = []
 
     def add(self, method, path, body=None, status=200, headers=None):
         self.routes.setdefault((method, path), []).append((status, body, headers or {}))
@@ -80,6 +81,7 @@ class FakeAPI:
         assert kwargs["unredirected_headers"] == ["Authorization"]
         path = url[len("https://www.pidginhost.com"):]
         self.headers.append(headers)
+        self.timeouts.append(timeout)
         self.calls.append((method, path, json.loads(data) if data else None))
         queue = self.routes.get((method, path))
         if not queue:

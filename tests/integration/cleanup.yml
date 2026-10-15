@@ -1,6 +1,7 @@
 ---
 # Removes what failed integration runs left behind in the CI account: every resource whose name starts
-# with "ansible-ci-", the test private networks and all unbound public IPs. Use the dedicated CI account only:
+# with "ansible-ci-" and the test private networks. Public IPs carry no test name, so unattached ones are
+# released only with -e cleanup_unbound_ips=true, which CI passes for its dedicated account. Run it there only:
 #   ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml
 - name: Sweep integration test leftovers
   hosts: localhost
@@ -72,6 +73,7 @@
             cleanup_failures: "{{ cleanup_failures + ['servers'] }}"
 
     - name: Clean up public ipv4 addresses
+      when: cleanup_unbound_ips | default(false) | bool
       block:
         - name: Read public ipv4 addresses
           pidginhost.cloud.ips_info:
@@ -92,6 +94,7 @@
             cleanup_failures: "{{ cleanup_failures + ['public ipv4 addresses'] }}"
 
     - name: Clean up public ipv6 addresses
+      when: cleanup_unbound_ips | default(false) | bool
       block:
         - name: Read public ipv6 addresses
           pidginhost.cloud.ips_info:

@@ -69,7 +69,7 @@ def cleanup_run(tmp_path):
     playbook = tmp_path / "cleanup.yml"
     shutil.copyfile(str(ROOT / "tests/integration/cleanup.yml"), str(playbook))
 
-    def run(fixtures, domain=""):
+    def run(fixtures, domain="", **extra_vars):
         fixtures = dict({"failures": [], "ips": {}}, **fixtures)
         fixtures_path.write_text(json.dumps(fixtures))
         env = {
@@ -84,7 +84,7 @@ def cleanup_run(tmp_path):
             "CLEANUP_CALLS": str(calls_path),
             "CLEANUP_FIXTURES": str(fixtures_path),
         }
-        variables = {"pidginhost_token": "test-token", "pidginhost_dns_domain": domain}
+        variables = dict({"pidginhost_token": "test-token", "pidginhost_dns_domain": domain}, **extra_vars)
         command = [sys.executable, "-m", "ansible.cli.playbook", str(playbook), "-i", "localhost,",
                    "-e", json.dumps(variables)]
         result = subprocess.run(command, cwd=str(tmp_path), env=env, stdout=subprocess.PIPE,
@@ -95,13 +95,24 @@ def cleanup_run(tmp_path):
     return run
 
 
+UNBOUND_IPS = {"ips": {
+    "ipv4": [{"address": "192.0.2.10", "attached": False, "server_id": None},
+             {"address": "192.0.2.11", "attached": False, "server_id": 42},
+             {"address": "192.0.2.12", "attached": True, "server_id": 43}],
+    "ipv6": [{"address": "2001:db8::10", "attached": False, "server_id": None}],
+}}
+
+
+def test_cleanup_keeps_unbound_ips_unless_asked(cleanup_run):
+    # Unbound addresses carry no test marker: a wrong token must not release an account's reserved IPs.
+    result, calls = cleanup_run(UNBOUND_IPS)
+
+    assert result.returncode == 0, result.stdout
+    assert [args for name, args in calls if name == "ip"] == []
+
+
 def test_cleanup_releases_unbound_ips_but_keeps_pending_attachments(cleanup_run):
-    result, calls = cleanup_run({"ips": {
-        "ipv4": [{"address": "192.0.2.10", "attached": False, "server_id": None},
-                 {"address": "192.0.2.11", "attached": False, "server_id": 42},
-                 {"address": "192.0.2.12", "attached": True, "server_id": 43}],
-        "ipv6": [{"address": "2001:db8::10", "attached": False, "server_id": None}],
-    }})
+    result, calls = cleanup_run(UNBOUND_IPS, cleanup_unbound_ips=True)
 
     assert result.returncode == 0, result.stdout
     assert {args["address"] for name, args in calls if name == "ip"} == {"192.0.2.10", "2001:db8::10"}

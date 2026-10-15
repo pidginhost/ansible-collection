@@ -21,6 +21,8 @@ from ansible.module_utils.urls import fetch_url
 BASE_URL = "https://www.pidginhost.com"
 TOKEN_ENV_VARS = ["PIDGINHOST_ACCESS_TOKEN", "PIDGINHOST_TOKEN"]
 POLL_INTERVAL = 5
+# A request sent near the end of a wait still gets this long; shorter fails on a real network.
+MIN_REQUEST_TIMEOUT = 10
 RESUBMIT_DELAY = 30
 # How the API words a refusal that ran nothing because another operation held the server.
 BUSY = "another server operation is in progress"
@@ -164,7 +166,8 @@ class PidginHostAPI(object):
             deadline = min(deadline, self._wait_deadline)
         while True:
             resp, info = fetch_url(self.module, url, data=data, headers=headers, method=method,
-                                   timeout=max(0, deadline - time.monotonic()), unredirected_headers=["Authorization"])
+                                   timeout=max(MIN_REQUEST_TIMEOUT, deadline - time.monotonic()),
+                                   unredirected_headers=["Authorization"])
             status = self.status = info.get("status", -1)
             if status != 429:
                 break

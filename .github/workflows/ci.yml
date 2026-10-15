@@ -93,6 +93,8 @@ jobs:
 
       - name: Remove leftovers from the CI account
         if: always()
-        run: ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml
+        run: >-
+          ansible-playbook tests/integration/cleanup.yml -e @tests/integration/integration_config.yml
+          -e cleanup_unbound_ips=true
         env:
           ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}
