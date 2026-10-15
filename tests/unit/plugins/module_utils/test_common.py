@@ -135,3 +135,21 @@ def test_custom_accept_returns_text(api, make_module):
     client = PidginHostAPI(make_module())
     assert client.get("/api/kubernetes/clusters/7/kubeconfig/", accept="text/plain") == "apiVersion: v1\n"
     assert api.headers[-1]["Accept"] == "text/plain"
+
+
+CLUSTERS = "/api/kubernetes/clusters/"
+
+
+def test_require_cluster_by_name(api, make_module):
+    api.add("GET", CLUSTERS, page([{"id": 3, "name": "prod"}, {"id": 4, "name": "dev"}]))
+
+    assert PidginHostAPI(make_module()).require_cluster(name="dev") == {"id": 4, "name": "dev"}
+
+
+def test_require_cluster_by_id_fails_when_missing(api, make_module):
+    api.add("GET", CLUSTERS + "9/", status=404)
+
+    with pytest.raises(Exception) as exc:
+        PidginHostAPI(make_module()).require_cluster(cluster_id=9)
+
+    assert "not found" in exc.value["msg"]

@@ -19,6 +19,7 @@ BASE_URL = "https://www.pidginhost.com"
 TOKEN_ENV_VARS = ["PIDGINHOST_ACCESS_TOKEN", "PIDGINHOST_TOKEN"]
 POLL_INTERVAL = 5
 SERVERS = "/api/cloud/servers/"
+CLUSTERS = "/api/kubernetes/clusters/"
 
 
 def pidginhost_argument_spec(**options):
@@ -198,3 +199,15 @@ class PidginHostAPI(object):
         if not server:
             self.module.fail_json(msg="Server %s not found." % (server_id or hostname))
         return server
+
+    def find_cluster(self, cluster_id=None, name=None):
+        """Return a Kubernetes cluster by id or unique name, or None if absent."""
+        if cluster_id:
+            return self.get("%s%s/" % (CLUSTERS, cluster_id), allow_404=True)
+        return self.find_one(self.list(CLUSTERS), "Kubernetes clusters", name=name)
+
+    def require_cluster(self, cluster_id=None, name=None):
+        cluster = self.find_cluster(cluster_id, name)
+        if not cluster:
+            self.module.fail_json(msg="Kubernetes cluster %s not found." % (cluster_id or name))
+        return cluster
